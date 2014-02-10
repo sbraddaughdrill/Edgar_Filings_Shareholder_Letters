@@ -4,9 +4,8 @@
 # File:    Download_Index_Files.R
 # Version: 1.0
 # Date:    02.5.2014
-# Purpose: This file downloads the index files from Edgar. Edgar has an index file for each quarter and 
-#          year so you need to grab each one.  
-#
+# Purpose: This program reads the company.idx files and then files are 
+#          downloaded to separate year directories
 ###############################################################################
 
 ###############################################################################
@@ -34,36 +33,36 @@ options(max.print = 500)
 #memory.limit(size = 8183)
 
 # Set location (1=HOME,2=WORK,3=CORALSEA FROM HOME,4=CORALSEA FROM WORK) Location <- 1
-Location <- 2
+Location <- 1
 
 if (Location == 1) {
   #setwd("C:/Research_temp3/")
-  input_directory <- normalizePath("C:/Users/Brad/Dropbox/Research/Fund_Letters/Data/",winslash="\\", mustWork=TRUE)
-  output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("C:/Users/Brad/Dropbox/Research_Methods/R/", winslash = "\\", mustWork = TRUE)
+  input_directory <- normalizePath("C:/Users/Brad/Dropbox/Research/Fund_Letters/Data",winslash="\\", mustWork=TRUE)
+  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("C:/Users/Brad/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("C:/TreeTagger",winslash="\\", mustWork=TRUE)    
   
 } else if (Location == 2) {
   #setwd("C:/Research_temp3/")
-  input_directory <- normalizePath("C:/Users/bdaughdr/Dropbox/Research/Fund_Letters/Data/",winslash="\\", mustWork=TRUE)
-  output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("C:/Users/bdaughdr/Dropbox/Research_Methods/R/",winslash="\\", mustWork=TRUE) 
+  input_directory <- normalizePath("C:/Users/bdaughdr/Dropbox/Research/Fund_Letters/Data",winslash="\\", mustWork=TRUE)
+  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("C:/Users/bdaughdr/Dropbox/Research_Methods/R",winslash="\\", mustWork=TRUE) 
   treetag_directory <- normalizePath("C:/TreeTagger",winslash="\\", mustWork=TRUE)    
   
 } else if (Location == 3) {
   #setwd("//tsclient/C/Research_temp3/")
-  input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data/", winslash = "\\", mustWork = TRUE)
-  #output_directory <- normalizePath("//tsclient/C/Research_temp3/", winslash = "\\", mustWork = TRUE)
-  output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("//tsclient/C/Users/Brad/Dropbox/Research_Methods/R/", winslash = "\\", mustWork = TRUE)
+  input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data", winslash = "\\", mustWork = TRUE)
+  #output_directory <- normalizePath("//tsclient/C/Research_temp3", winslash = "\\", mustWork = TRUE)
+  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("//tsclient/C/Users/Brad/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("//tsclient/C/TreeTagger",winslash="\\", mustWork=TRUE)    
   
 } else if (Location == 4) {
   #setwd("//tsclient/C/Research_temp3/")
-  input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data/", winslash = "\\", mustWork = TRUE)
-  #output_directory <- normalizePath("//tsclient/C/Research_temp3/", winslash = "\\", mustWork = TRUE)
-  output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("//tsclient/C/Users/bdaughdr/Dropbox/Research_Methods/R/", winslash = "\\", mustWork = TRUE)
+  input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data", winslash = "\\", mustWork = TRUE)
+  #output_directory <- normalizePath("//tsclient/C/Research_temp3", winslash = "\\", mustWork = TRUE)
+  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("//tsclient/C/Users/bdaughdr/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("//tsclient/C/TreeTagger",winslash="\\", mustWork=TRUE)       
   
 } else {
@@ -78,10 +77,37 @@ rm(Location)
 cat("SECTION: FUNCTIONS", "\n")
 ###############################################################################
 
-source(file=paste(function_directory,"functions_db.R",sep=""),echo=FALSE)
-source(file=paste(function_directory,"functions_statistics.R",sep=""),echo=FALSE)
-source(file=paste(function_directory,"functions_text_analysis.R",sep=""),echo=FALSE)
-source(file=paste(function_directory,"functions_utilities.R",sep=""),echo=FALSE)
+source(file=paste(function_directory,"functions_db.R",sep="\\"),echo=FALSE)
+source(file=paste(function_directory,"functions_statistics.R",sep="\\"),echo=FALSE)
+source(file=paste(function_directory,"functions_text_analysis.R",sep="\\"),echo=FALSE)
+source(file=paste(function_directory,"functions_utilities.R",sep="\\"),echo=FALSE)
+
+create_directory <- function(path,remove=1){
+  if (file.exists(path)) {
+    
+    if (file.info(path)$isdir) {
+      cat(path,"exists and is a directory. \n")
+      
+    } else {
+      
+      if (remove==1) {
+        cat(path,"exists and is a file.  File will be removed and directory will be created.  \n")
+        file.remove(path)
+        dir.create(path,showWarnings = TRUE)
+        
+      } else {
+        cat(path,"exists and is a file.  File will not be removed and directory will not be created. \n")
+        
+      }
+      
+    }
+    
+  } else {
+    cat(path,"does not exist and will be created. \n")
+    dir.create(path,showWarnings = TRUE)
+    
+  }
+}
 
 
 ###############################################################################
@@ -89,14 +115,12 @@ source(file=paste(function_directory,"functions_utilities.R",sep=""),echo=FALSE)
 cat("SECTION: LIBRARIES", "\n")
 ###############################################################################
 
-update.packages(ask=FALSE, checkBuilt=TRUE)
-
 #Load External Packages
 #external_packages <- c("compare","cwhmisc","data.table","fastmatch","foreign","formatR","gdata","gtools",
 #                       "Hmisc","koRpus","mitools","pbapply","plyr","R.oo","reshape2","rJava","RWeka","RWekajars",
 #                       "Snowball","sqldf","stringr","tcltk","tm")
 #external_packages <- c("httr","rjson","RCurl","ROAuth","selectr","XML")
-external_packages <- c("data.table","RCurl")
+external_packages <- c("data.table","gdata","RCurl","reshape2")
 invisible(unlist(sapply(external_packages,load_external_packages, repo_str=repo, simplify=FALSE, USE.NAMES=FALSE)))
 installed_packages <- list_installed_packages(external_packages)
 
@@ -108,13 +132,20 @@ installed_packages <- list_installed_packages(external_packages)
 slash <- "\\"
 
 #First year you want index files for:
-startyear <- 1993
+
+#startyear <- 1993
+startyear <- 2008
+
 #Last year you want index files for:
-endyear <- 2012
+#endyear <- 2012
+endyear <- 2008
+
 #First qtr you want index files for (usually 1):
 startqtr <- 1
+
 #Last qtr you want index files for (usually 4):
 endqtr <- 4
+
 #Output folder:
 indexfolder <- "full-index"
 
@@ -132,7 +163,11 @@ outfile <- "getfiles.txt"
 #I put a ^ at the beginning because I want the form type to start with 10, this gets rid of NT late filings.
 #I also want to exclude amended filings so I specify that 10-k should not be followed by / (e.g., 10-K/A).
 
-formget <- '(N-1  |N-1/A  |N-1/A  |N-1A  |N-1A/A  |N-1A EL  |N-1A EL/A  |497K  |497K1  |497K2  |497K3A  |497K3B  )'
+#formget <- '(N-1  |N-1/A  |N-1/A  |N-1A  |N-1A/A  |N-1A EL  |N-1A EL/A  |497K  |497K1  |497K2  |497K3A  |497K3B  )'
+formget <- c("N-1","N-1/A","N-1/A","N-1A","N-1A/A","N-1A EL","N-1A EL/A","497K","497K1","497K2","497K3A","497K3B")
+
+#FTP address
+ftp <- "ftp.sec.gov"
 
 company_name_start <- 0
 company_name_length <- 61
@@ -151,37 +186,43 @@ fullfilename_length <- 43
 cat("Begin Script \n")
 #=====================================================================;
 
-#Check to see if project root directory exists.  If not, create it.
-if (file.exists(paste(projectrootdirectory, slash, sep = slash, collapse = slash))) {
-  cat("projectrootdirectory exists and is a directory")
-} else if (file.exists(projectrootdirectory)) {
-  cat("projectroot exists but is a file")
-  # you will probably want to handle this separately
-} else {
-  cat("projectrootdirectory does not exist  - creating")
-  #dir.create(file.path(projectrootdirectory, indexfolder),showWarnings = TRUE)
-  dir.create(projectrootdirectory,showWarnings = TRUE)
-  
-}
+#Check to see if output directory exists.  If not, create it.
+create_directory(output_directory,remove=1)
 
 #Check to see if download folder exists.  If not, create it.
-if (file.exists(paste(projectrootdirectory, downloadfolder, slash, sep = slash, collapse = slash))) {
-  cat("downloadfolder exists in projectrootdirectory and is a directory")
-} else if (file.exists(paste(projectrootdirectory, downloadfolder, sep = slash, collapse = slash))) {
-  cat("downloadfolder exists in projectrootdirectory but is a file")
-  # you will probably want to handle this separately
-} else {
-  cat("downloadfolder does not exist in projectrootdirectory - creating")
-  dir.create(paste(projectrootdirectory, downloadfolder, sep = slash, collapse = slash),showWarnings = TRUE)
-  
-}
+download_folder_path <- paste(output_directory, downloadfolder, sep = slash, collapse = slash)  
+create_directory(download_folder_path,remove=1)
 
+#Create Summary Table
+ts <- ts(NA, start=c(startyear, startqtr), end=c(endyear, endqtr), frequency=4) 
+
+ts_cast <- tapply(ts, list(year = floor(time(ts)), qtr = cycle(ts)), c)
+ts_cast_df <- data.frame(yr=row.names(ts_cast),
+                         ts_cast,
+                         stringsAsFactors=FALSE)
+row.names(ts_cast_df) <- seq(nrow(ts_cast_df))
+colnames(ts_cast_df) <- c("yr","1","2","3","4")
+
+summary_full <- melt(ts_cast_df,id=c("yr"))
+colnames(summary_full) <- c("yr","qtr","good_filing_count")
+
+summary_full <- summary_full[order(summary_full[,"yr"],summary_full[,"qtr"]),]
+summary_full[,"qtr"] <- as.integer(summary_full[,"qtr"])
+
+summary <- summary_full
+summary <- summary[!(summary[,"yr"]==startyear & summary[,"qtr"]<startqtr),]
+summary <- summary[!(summary[,"yr"]==endyear & summary[,"qtr"]>endqtr),]
+
+row.names(summary) <- seq(nrow(summary))
+
+
+#Get filings
 yr <- startyear
 qtr <- startqtr
 
 for (yr in startyear:endyear)
 {
-  #yr <- startyear
+  #yr <- 2008
   
   cat(yr,"\n")
   
@@ -194,18 +235,16 @@ for (yr in startyear:endyear)
     eqtr  <- endqtr
   }
   
-  
   #Check to see if yr folder exists.  If not, create it.
-  if (file.exists(paste(projectrootdirectory, downloadfolder, yr, slash, sep = slash, collapse = slash))) {
-    cat("yr exists in projectrootdirectory and is a directory")
-  } else if (file.exists(paste(projectrootdirectory, downloadfolder, yr, sep = slash, collapse = slash))) {
-    cat("yr exists in projectrootdirectory but is a file")
-    # you will probably want to handle this separately
-  } else {
-    cat("yr does not exist in projectrootdirectory - creating")
-    dir.create(paste(projectrootdirectory, downloadfolder, yr, sep = slash, collapse = slash),showWarnings = TRUE)
-    
-  }
+  yr_folder_path <- paste(output_directory, downloadfolder, yr, sep = slash, collapse = slash)   
+  create_directory(yr_folder_path,remove=1)
+  
+  #Check to see if originalfolder folder exists.  If not, create it.
+  original_folder_path <- paste(output_directory, downloadfolder, yr, originalfolder, sep = slash, collapse = slash)    
+  create_directory(original_folder_path,remove=1)
+  
+  #Path to outfile
+  ofidx <- paste(output_directory,downloadfolder,yr,outfile,sep=slash)
   
   for (qtr in startqtr:endqtr)
   {
@@ -213,88 +252,103 @@ for (yr in startyear:endyear)
     
     cat(qtr,"\n")
     
-    fidx <- paste(projectrootdirectory,slash,indexfolder,slash,"company",yr,qtr,".idx",sep="")
+    #Path to infile
+    fidx <- paste(output_directory,slash,indexfolder,slash,"company",yr,qtr,".idx",sep="")
     
+    #Read infile
     con <- file(fidx, 'r') 
-    
-    ofidx <- paste(projectrootdirectory,downloadfolder,yr,outfile,sep=slash)
-    
-    #Open the file you want to write to.  The first time through the file is opened to "replace" the existing file.
-    #After that, it is opened to append .
-    
-    #     if (yr=startyear & qtr=startqtr ) {
-    #       cat("replace \n")
-    #       
-    outfile <- file(ofidx, 'w') 
-    #       
-    #     } else {
-    #       
-    #       cat("append \n")
-    #       
-    #       outfile <- file.append(ofidx, con) 
-    #       
-    #     }
-    
-    #     
-    #     while (length(input <- readLines(con, n=1000) > 0){ 
-    #       for (i in 1:length(input)){ 
-    #         
-    #         ......your one line at a time processing 
-    #         
-    #         
-    #       } 
-    #       writeLines(output, con=outfile) 
-    #     } 
-    #     
-    
     input <- readLines(con)
+    close(con)
+    
+    #Convert to data.frame
+    expanded_cols <- c("company_name","form_type","cik","file_date","fullfilename","good_filing_flag")
     input_df <- data.frame(input,
-                           matrix(NA, nrow = length(input), ncol = 5,dimnames = list(NULL,c("company_name","form_type","cik","file_date","fullfilename"))),
+                           matrix(NA, nrow = length(input), ncol = 6,dimnames = list(NULL,expanded_cols)),
                            stringsAsFactors=FALSE)
     
-    count <- 1
-    
-    #     for (i in 11:nrow(input_df))
-    #     {
-    #       #i <- 10
-    #       
-    #       cat(i,"\n") 
-    #       
-    #       #Ignore the first 10 lines because they only contain header information
-    #       if (i<11) {
-    #         cat("Header Information \n")
-    #         
-    #       } else {
-    #         cat("File Information \n")
-    # 
-    #         input_df[i,"form_type"] <- substr(input_df[i,"input"], 62, 12)
-    #         input_df[i,"file_date"] <- substr(input_df[i,"input"], 86, 10)
-    #         input_df[i,"fullfilename"] <- substr(input_df[i,"input"], 98, 43)
-    #       
-    #       }
-    #       
-    #     }
-    
+    #Populate new columns
     input_df[,"company_name"] <- substring(input_df[,"input"], company_name_start, company_name_start+company_name_length)  
     input_df[,"form_type"] <- substring(input_df[,"input"], form_type_start, form_type_start+form_type_length)
     input_df[,"cik"] <- substring(input_df[,"input"], cik_start, cik_start+cik_length)
     input_df[,"file_date"] <- substr(input_df[,"input"], file_date_start, file_date_start+file_date_length)
     input_df[,"fullfilename"] <- substr(input_df[,"input"], fullfilename_start, fullfilename_start+fullfilename_length)
     
-    for (i in 1:10)
+    #Format new columns
+    for (i in expanded_cols)
     {
       #i <- 1
       
-      input_df[i,"company_name"] <- NA
-      input_df[i,"form_type"] <- NA
-      input_df[i,"cik"] <- NA
-      input_df[i,"file_date"] <- NA
-      input_df[i,"fullfilename"] <- NA
+      input_df[1:10,i] <- NA
+      input_df[,i] <- trim(input_df[,i])
       
     }
     
+    #Fix Date
+    input_df[,"file_date"] <- as.Date(input_df[,"file_date"],format="%Y-%m-%d")
+    
+    #Determine if filing is one of the ones desired
+    input_df[,"good_filing_flag"] <- ifelse(is.na(input_df[,"form_type"]), NA, 0)
+    input_df[,"good_filing_flag"] <- ifelse(input_df[,"form_type"] %in% formget, 1, input_df[,"good_filing_flag"])
+    
+    good_filings <- input_df[(!is.na(input_df[,"good_filing_flag"]) & input_df[,"good_filing_flag"]==1),"fullfilename"]
+    
+    #Open the file you want to write to.  The first time through the file is opened to "replace" the existing file.
+    #After that, it is opened to append .
+    
+    #     if (yr==startyear & qtr==startqtr ) {
+    #       cat("replace \n")
+    #       
+    #       write(good_filings,ofidx,append=FALSE)
+    #       
+    #     } else {
+    #       
+    #       cat("append \n")
+    #       
+    #       write(good_filings,ofidx,append=TRUE)
+    #       
+    #     }
+    
+    write(good_filings,ofidx,append=TRUE)
     
     
+    #Put count in summary table
+    summary[(summary[,"yr"]==yr & summary[,"qtr"]==qtr),"good_filing_count"] <- sum(input_df[,"good_filing_flag"], na.rm = TRUE)
+    
+  } 
+  
+  #Get name of all files already downloaded
+  old <- list.files(original_folder_path)
+  
+  #Get the names of the files to download
+  ocon <- file(ofidx, 'r') 
+  files_to_download <- data.frame(fullfilename=readLines(ocon),
+                                  filename_start=NA,
+                                  filename=NA,
+                                  already_downloaded=NA,
+                                  stringsAsFactors=FALSE)
+  close(ocon)
+  
+  #Find starting position of file name
+  #files_to_download[,"filename_start"] <- regexpr("\\.[^\\.]*$", files_to_download[,"fullfilename"])
+  files_to_download[,"filename_start"] <- sapply(gregexpr("/", files_to_download[,"fullfilename"]), function(x) rev(x)[1])
+  
+  #Create short filename
+  files_to_download[,"filename"] <- substr(files_to_download[,"fullfilename"], 
+                                           (files_to_download[,"filename_start"]+1), 
+                                           nchar(files_to_download[,"fullfilename"]))
+  
+  #checks to see what files on the current index listing are not in the directory
+  files_to_download[,"already_downloaded"] <- ifelse(files_to_download[,"filename"] %in% old, 1, 0)
+  
+  #Download files
+  for (i in which(files_to_download[,"already_downloaded"]==0))
+  {
+    #i<- head(which(files_to_download[,"already_downloaded"]==0),1)
+    
+    fileout <- paste(original_folder_path,files_to_download[i,"filename"],sep=slash)
+    
+    download.file(paste("ftp://",ftp,"/",files_to_download[i,"fullfilename"],sep=""), fileout, quiet = FALSE, mode = "wb",cacheOK = TRUE)
+
   } 
   
 } 

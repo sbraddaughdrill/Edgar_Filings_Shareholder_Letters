@@ -34,36 +34,36 @@ options(max.print = 500)
 #memory.limit(size = 8183)
 
 # Set location (1=HOME,2=WORK,3=CORALSEA FROM HOME,4=CORALSEA FROM WORK) Location <- 1
-Location <- 2
+Location <- 1
 
 if (Location == 1) {
   #setwd("C:/Research_temp3/")
-  input_directory <- normalizePath("C:/Users/Brad/Dropbox/Research/Fund_Letters/Data/",winslash="\\", mustWork=TRUE)
-  output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("C:/Users/Brad/Dropbox/Research_Methods/R/", winslash = "\\", mustWork = TRUE)
+  input_directory <- normalizePath("C:/Users/Brad/Dropbox/Research/Fund_Letters/Data",winslash="\\", mustWork=TRUE)
+  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("C:/Users/Brad/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("C:/TreeTagger",winslash="\\", mustWork=TRUE)    
   
 } else if (Location == 2) {
   #setwd("C:/Research_temp3/")
-  input_directory <- normalizePath("C:/Users/bdaughdr/Dropbox/Research/Fund_Letters/Data/",winslash="\\", mustWork=TRUE)
-  output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("C:/Users/bdaughdr/Dropbox/Research_Methods/R/",winslash="\\", mustWork=TRUE) 
+  input_directory <- normalizePath("C:/Users/bdaughdr/Dropbox/Research/Fund_Letters/Data",winslash="\\", mustWork=TRUE)
+  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("C:/Users/bdaughdr/Dropbox/Research_Methods/R",winslash="\\", mustWork=TRUE) 
   treetag_directory <- normalizePath("C:/TreeTagger",winslash="\\", mustWork=TRUE)    
   
 } else if (Location == 3) {
   #setwd("//tsclient/C/Research_temp3/")
-  input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data/", winslash = "\\", mustWork = TRUE)
-  #output_directory <- normalizePath("//tsclient/C/Research_temp3/", winslash = "\\", mustWork = TRUE)
-  output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("//tsclient/C/Users/Brad/Dropbox/Research_Methods/R/", winslash = "\\", mustWork = TRUE)
+  input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data", winslash = "\\", mustWork = TRUE)
+  #output_directory <- normalizePath("//tsclient/C/Research_temp3", winslash = "\\", mustWork = TRUE)
+  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("//tsclient/C/Users/Brad/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("//tsclient/C/TreeTagger",winslash="\\", mustWork=TRUE)    
   
 } else if (Location == 4) {
   #setwd("//tsclient/C/Research_temp3/")
-  input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data/", winslash = "\\", mustWork = TRUE)
-  #output_directory <- normalizePath("//tsclient/C/Research_temp3/", winslash = "\\", mustWork = TRUE)
-  output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("//tsclient/C/Users/bdaughdr/Dropbox/Research_Methods/R/", winslash = "\\", mustWork = TRUE)
+  input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data", winslash = "\\", mustWork = TRUE)
+  #output_directory <- normalizePath("//tsclient/C/Research_temp3", winslash = "\\", mustWork = TRUE)
+  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("//tsclient/C/Users/bdaughdr/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("//tsclient/C/TreeTagger",winslash="\\", mustWork=TRUE)       
   
 } else {
@@ -78,18 +78,43 @@ rm(Location)
 cat("SECTION: FUNCTIONS", "\n")
 ###############################################################################
 
-source(file=paste(function_directory,"functions_db.R",sep=""),echo=FALSE)
-source(file=paste(function_directory,"functions_statistics.R",sep=""),echo=FALSE)
-source(file=paste(function_directory,"functions_text_analysis.R",sep=""),echo=FALSE)
-source(file=paste(function_directory,"functions_utilities.R",sep=""),echo=FALSE)
+source(file=paste(function_directory,"functions_db.R",sep="\\"),echo=FALSE)
+source(file=paste(function_directory,"functions_statistics.R",sep="\\"),echo=FALSE)
+source(file=paste(function_directory,"functions_text_analysis.R",sep="\\"),echo=FALSE)
+source(file=paste(function_directory,"functions_utilities.R",sep="\\"),echo=FALSE)
+
+create_directory <- function(path,remove=1){
+  if (file.exists(path)) {
+    
+    if (file.info(path)$isdir) {
+      cat(path,"exists and is a directory. \n")
+      
+    } else {
+      
+      if (remove==1) {
+        cat(path,"exists and is a file.  File will be removed and directory will be created.  \n")
+        file.remove(path)
+        dir.create(path,showWarnings = TRUE)
+        
+      } else {
+        cat(path,"exists and is a file.  File will not be removed and directory will not be created. \n")
+        
+      }
+      
+    }
+    
+  } else {
+    cat(path,"does not exist and will be created. \n")
+    dir.create(path,showWarnings = TRUE)
+    
+  }
+}
 
 
 ###############################################################################
 # LIBRARIES;
 cat("SECTION: LIBRARIES", "\n")
 ###############################################################################
-
-update.packages(ask=FALSE, checkBuilt=TRUE)
 
 #Load External Packages
 #external_packages <- c("compare","cwhmisc","data.table","fastmatch","foreign","formatR","gdata","gtools",
@@ -117,47 +142,20 @@ startqtr <- 1
 endqtr <- 4
 #Output folder:
 indexfolder <- "full-index"
-
+#FTP address
+ftp <- "ftp.sec.gov"
 
 #=====================================================================;
 #BEGIN SCRIPT;
 cat("Begin Script \n")
 #=====================================================================;
 
-#Check to see if project root directory exists.  If not, create it.
-if (file.exists(paste(output_directory, slash, sep = slash, collapse = slash))) {
-  cat("output_directory exists and is a directory")
-} else if (file.exists(output_directory)) {
-  cat("projectroot exists but is a file")
-  # you will probably want to handle this separately
-} else {
-  cat("output_directory does not exist  - creating")
-  #dir.create(file.path(output_directory, indexfolder),showWarnings = TRUE)
-  dir.create(output_directory,showWarnings = TRUE)
-  
-}
+#Check to see if output directory exists.  If not, create it.
+create_directory(output_directory,remove=1)
 
 #Check to see if index folder exists.  If not, create it.
-if (file.exists(paste(output_directory, indexfolder, slash, sep = slash, collapse = slash))) {
-  cat("indexfolder exists in output_directory and is a directory")
-} else if (file.exists(paste(output_directory, indexfolder, sep = slash, collapse = slash))) {
-  cat("indexfolder exists in output_directory but is a file")
-  # you will probably want to handle this separately
-} else {
-  cat("indexfolder does not exist in output_directory - creating")
-  dir.create(paste(output_directory, indexfolder, sep = slash, collapse = slash),showWarnings = TRUE)
-  
-}
-
-
-#get index files;
-#FTP signin-
-#$ftp = Net::FTP->new("ftp.sec.gov", Debug => 0) or die "Cannot connect to some.host.name: $@";
-
-#This provides your user name and password.
-#$ftp->login("anonymous",'-anonymous@') or die "Cannot login ", $ftp->message;
-
-ftp <- "ftp.sec.gov"
+index_folder_path <- paste(output_directory, indexfolder, sep = slash, collapse = slash) 
+create_directory(index_folder_path,remove=1)
 
 #Get files loop- The program will loop through each year specified.
 #Note that the counter (yr) starts with a value equal to start year and increments by 1 each time through.  The loop terminates after the counter exceeds $endyear.
@@ -185,13 +183,13 @@ for (yr in startyear:endyear)
     
     cat(qtr,"\n")
 
-    filetoget <- paste("/edgar/full-index/",yr,"/QTR",qtr,"/company.zip",sep="")
+    filetoget <- paste("edgar/full-index/",yr,"/QTR",qtr,"/company.zip",sep="")
     
     fonly <- paste(output_directory,slash,indexfolder,slash,"company",yr,qtr,".zip",sep="")
     
     fidx <- paste(output_directory,slash,indexfolder,slash,"company",yr,qtr,".idx",sep="")
     
-    download.file(paste("ftp://",ftp,filetoget,sep=""), fonly, quiet = FALSE, mode = "wb",cacheOK = TRUE)
+    download.file(paste("ftp://",ftp,"/",filetoget,sep=""), fonly, quiet = FALSE, mode = "wb",cacheOK = TRUE)
     
     # unzip the files
     unzip( fonly , files="company.idx",exdir = paste(output_directory, indexfolder, sep = slash, collapse = slash) )
