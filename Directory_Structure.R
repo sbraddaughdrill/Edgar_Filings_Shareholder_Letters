@@ -3,7 +3,10 @@ library(DataCombine)
 library(gdata)
 library(plyr)
 library(RCurl)
+library(RJDBC)
 library(XML)
+
+options(scipen=999)
 
 convb <- function(x){
   ptn <- "(\\d*(.\\d+)*)(.*)"
@@ -155,23 +158,81 @@ directory_level2 <- data.frame(matrix(NA, nrow = 20000, ncol = 11,dimnames = lis
 cat("SECTION: IMPORT CIK CATALOG", "\n")
 ###############################################################################
 
-#Get identifiers
-cik <- c("0001414040","0000876603")
+output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
 
-cik_catalog <- data.frame(CIK=cik,
-                          CIK_no_pad=NA,
+cik_catalog_temp <- read.csv(file=paste(output_directory,"cik_list.csv",sep="/"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+cik_catalog_temp <- as.data.frame(cik_catalog_temp,stringsAsFactors=FALSE)
+colnames(cik_catalog_temp) <- "CIK_no_pad"
+
+
+for (i in 1:nrow(cik_catalog_temp))
+{
+  #i <- 1
+
+  tryCatch(cik_catalog_temp[i,"CIK_no_pad"] <- as.integer(cik_catalog_temp[i,"CIK_no_pad"]), 
+           warning=function(i) { cat("problem values:", i, "\n") } ) 
+  
+} 
+
+
+
+
+
+
+
+
+
+
+
+cik_catalog_temp[,"CIK_no_pad"] <- as.numeric(cik_catalog_temp[,"CIK_no_pad"])
+cik_catalog_temp[,"CIK_no_pad"] <- round(cik_catalog_temp[,"CIK_no_pad"], digits = 0)
+
+
+#cik_catalog_temp[,"CIK_no_pad"] <- as.character(cik_catalog_temp[,"CIK_no_pad"])
+#for(i in which(sapply(cik_catalog_temp,class)=="character"))
+#{
+#  cik_catalog_temp[[i]] = trim(cik_catalog_temp[[i]])
+#}
+
+for (i in 1:ncol(cik_catalog_temp))
+{
+  cik_catalog_temp[,i] <- unknownToNA(cik_catalog_temp[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                                              NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                                              NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+  cik_catalog_temp[,i] <- ifelse(is.na(cik_catalog_temp[,i]),NA, cik_catalog_temp[,i])
+} 
+
+#cik_catalog_temp[,"CIK_no_pad"] <- as.numeric(cik_catalog_temp[,"CIK_no_pad"])
+#cik_catalog_temp[,"CIK_no_pad"] <- as.integer(cik_catalog_temp[,"CIK_no_pad"])
+
+cik_catalog <- data.frame(CIK=NA,
+                          CIK_no_pad=cik_catalog_temp,
                           Description="Directory",
                           Sub_Link_HTTP=NA,
                           Sub_Link_FTP=NA,
                           stringsAsFactors=FALSE)
 
-#Remove leading zeros in CIK
-cik_catalog[,"CIK_no_pad"] <- as.character(as.integer(cik_catalog[,"CIK"]))
+
+#cik_catalog[,"CIK"] <- sprintf("%010d",cik_catalog[,"CIK_no_pad"])
+cik_catalog[,"CIK"] <- formatC(cik_catalog[,"CIK_no_pad"], width = 10,flag = 0)
+cik_catalog[,"CIK"] <- as.character(cik_catalog[,"CIK"])
+
+#cik_catalog[,"CIK_no_pad"] <- as.character(cik_catalog[,"CIK_no_pad"])
 
 #Get addresses
 cik_catalog[,"Sub_Link_HTTP"] <- paste("http://www.sec.gov/Archives/edgar/data/",cik_catalog[,"CIK_no_pad"],"/",sep="") 
 cik_catalog[,"Sub_Link_FTP"] <- paste("ftp://ftp.sec.gov/edgar/data/",cik_catalog[,"CIK_no_pad"],"/",sep="") 
 
+rm(cik_catalog2)
+
+#Get identifiers
+#cik_catalog2 <- cik_catalog[cik_catalog[,"CIK"] %in% c("0001414040","0000876603"),] 
+cik_catalog2 <- cik_catalog[cik_catalog[,"CIK"] == "0001414040",] 
+#cik_catalog2 <- cik_catalog[cik_catalog[,"CIK_no_pad"] == 1414040,] 
+
+#which(cik_catalog[,"CIK"] %in% c("0001414040","0000876603"))
+
+row.names(cik_catalog2) <- seq(nrow(cik_catalog2))
 
 ###############################################################################
 cat("SECTION: LEVEL 1 DIRECTORY", "\n")
