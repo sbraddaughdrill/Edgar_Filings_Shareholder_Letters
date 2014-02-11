@@ -60,7 +60,7 @@ directory_cleaning <- function(directory_df){
   return(directory_df)
 }
 
-directory_expand <- function(directory_df){
+directory_expand <- function(directory_df,http_address,ftp_address){
   temp_directory_full <- data.frame(CIK=cik,
                                     CIK_no_pad=cik_no_pad,
                                     Accession_num=NA,
@@ -68,7 +68,8 @@ directory_expand <- function(directory_df){
                                     Last_Modified=directory_df[,"Last.modified"],                          
                                     Size=directory_df[,"Size"],                            
                                     Description=directory_df[,"Description"], 
-                                    Link=NA,
+                                    Link_HTTP=NA,
+                                    Link_FTP=NA,
                                     stringsAsFactors=FALSE)
   
   #Remove all NA rows
@@ -92,10 +93,19 @@ directory_expand <- function(directory_df){
   temp_directory_full[,"Size"] <- ifelse(temp_directory_full[,"Size"]=="-",NA, temp_directory_full[,"Size"])
   temp_directory_full[,"Size"] <- convb(temp_directory_full[,"Size"])
   
+  #Create Link
+  #temp_directory_full[,"Link"] <- ifelse(temp_directory_full[,"Description"]=="Directory",
+  #                                paste(http_address,temp_directory_full[,"Name"],sep=""),
+  #                                paste(ftp_address,temp_directory_full[,"Name"],sep=""))
+  
+  temp_directory_full[,"Link_HTTP"] <- paste(http_address,temp_directory_full[,"Name"],sep="")
+  temp_directory_full[,"Link_FTP"] <- paste(ftp_address,temp_directory_full[,"Name"],sep="")
+  
+  
   return(temp_directory_full)
 }
 
-directory_links_L1 <- function(directory_df,http_address,ftp_address){
+directory_Accession_num_L1 <- function(directory_df)
   
   #Accession string positions and lengths
   Accession_start1 <- 0
@@ -111,15 +121,12 @@ directory_links_L1 <- function(directory_df,http_address,ftp_address){
   #                                          substring(gsub(pattern="-", replacement="", directory_df[,"Name"]), Accession_start3, Accession_start3+Accession_length3),
   #                                          sep="-")
   
-  #Create Link
-  directory_df[,"Link"] <- ifelse(directory_df[,"Description"]=="Directory",
-                                  paste(http_address,directory_df[,"Name"],sep=""),
-                                  paste(ftp_address,directory_df[,"Name"],sep=""))
+
   
   return(directory_df)
 }
 
-directory_links_L2 <- function(directory_df,http_address,ftp_address){
+directory_Accession_num_L2 <- function(directory_df){
   
   #Accession string positions and lengths
   Accession_start1 <- 0
@@ -135,90 +142,105 @@ directory_links_L2 <- function(directory_df,http_address,ftp_address){
   #                                          substring(gsub(pattern="-", replacement="", directory_df[,"Name"]), Accession_start3, Accession_start3+Accession_length3),
   #                                          sep="-")
   
-  #Create Link
-  directory_df[,"Link"] <- ifelse(directory_df[,"Description"]=="Directory",
-                                  paste(webpage_address_http,directory_df[,"Name"],sep=""),
-                                  paste(webpage_address_ftp,directory_df[,"Name"],sep=""))
-  
   return(directory_df)
 }
 
 
+###############################################################################
+cat("SECTION: PREALLOCATE DATA", "\n")
+############################################################################### 
 
-#######################
-# BEGIN
-#####################
+#Create base column table
+#temp_data_cols <- as.data.frame(matrix(NA, ncol=7, nrow=200),stringsAsFactors=FALSE)
+#colnames(temp_data_cols) <- c("order","isnum","ischar","isdate","isfactor","colnames","desc")
+#temp_data_cols[,1] <- as.numeric(temp_data_cols[,1])
+#temp_data_cols[,2] <- as.numeric(temp_data_cols[,2])
+#temp_data_cols[,3] <- as.numeric(temp_data_cols[,3])
+#temp_data_cols[,4] <- as.numeric(temp_data_cols[,4])
+#temp_data_cols[,5] <- as.numeric(temp_data_cols[,5])
+#temp_data_cols[,6] <- as.character(temp_data_cols[,6])
+#temp_data_cols[,7] <- as.character(temp_data_cols[,7])
 
 
-#####################################
-# LEVEL 1
-#####################################
+#Level 1 Directory table
+#directory_level1_cols_count <- 9
+#directory_level1_cols <- temp_data_cols[1:directory_level1_cols_count,]
+#directory_level1_cols[1,] <- data.frame(order=1,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="CIK","",stringsAsFactors=FALSE)
+#directory_level1_cols[2,] <- data.frame(order=2,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="CIK_no_pad","",stringsAsFactors=FALSE)
+#directory_level1_cols[3,] <- data.frame(order=3,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Accession_num","",stringsAsFactors=FALSE)
+#directory_level1_cols[4,] <- data.frame(order=4,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Name","",stringsAsFactors=FALSE)
+#directory_level1_cols[5,] <- data.frame(order=5,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Last_Modified","",stringsAsFactors=FALSE)
+#directory_level1_cols[6,] <- data.frame(order=6,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Size","",stringsAsFactors=FALSE)
+#directory_level1_cols[7,] <- data.frame(order=7,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Description","",stringsAsFactors=FALSE)
+#directory_level1_cols[8,] <- data.frame(order=8,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Link_HTTP","",stringsAsFactors=FALSE)
+#directory_level1_cols[8,] <- data.frame(order=9,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Link_FTP","",stringsAsFactors=FALSE)
+#directory_level1 <- as.data.frame(matrix(NA, ncol=directory_level1_cols_count, nrow=100),stringsAsFactors=FALSE)
+#colnames(directory_level1) <- directory_level1_cols[,6]
 
+
+directory_level1_cols <- c("CIK","CIK_no_pad","Accession_num","Name","Last_Modified","Size","Description","Link_HTTP","Link_FTP")
+input_df <- data.frame(input,
+                       matrix(NA, nrow = length(input), ncol = 6,dimnames = list(NULL,expanded_cols)),
+                       stringsAsFactors=FALSE)
+
+
+
+
+
+
+###############################################################################
+cat("SECTION: LEVEL 1 DIRECTORY", "\n")
+###############################################################################
+
+#Get identifiers
 cik <- "0001414040"
 cik_no_pad <- as.character(as.integer(cik))
 
-webpage_address_ftp <- paste("ftp://ftp.sec.gov/edgar/data/",cik_no_pad,"/",sep="") 
-#filenames <- getURL(webpage_address_ftp, ftp.use.epsv = FALSE, ftplistonly = TRUE, crlf = TRUE) 
-
-webpage_address_http <- paste("http://www.sec.gov/Archives/edgar/data/",cik_no_pad,"/",sep="") 
-
-
-
+#Get addresses
+directory_address_http <- paste("http://www.sec.gov/Archives/edgar/data/",cik_no_pad,"/",sep="") 
+directory_address_ftp <- paste("ftp://ftp.sec.gov/edgar/data/",cik_no_pad,"/",sep="") 
 
 #Get Directory
-directory <- directory_listing(webpage_address_http)
+directory <- directory_listing(directory_address_http)
 
 #Clean Directory
 directory <- directory_cleaning(directory)
 
 #Expand Directory
-directory_full <- directory_expand(directory)
+directory_full <- directory_expand(directory,directory_address_http,directory_address_ftp)
 
-#Create Level 1 Directory Links
-directory_full <- directory_links_L1(directory_full,webpage_address_http,webpage_address_ftp)
+#Create Accession Number
+#directory_full <- directory_Accession_num_L1(directory_full)
 
 
-#####################################
-# LEVEL 2
-#####################################
+###############################################################################
+cat("SECTION: LEVEL 2 DIRECTORY", "\n")
+###############################################################################
 
 for(i in which(directory_full[,"Description"]=="Directory"))
 {
   #i <- head(which(directory_full[,"Description"]=="Directory"),1)
+
+  #Get identifiers
+  sub_cik <- directory_full[i,"CIK"]
+  sub_cik_no_pad <- directory_full[i,"CIK_no_pad"]
   
-  
-  
-  
-  
-  
-  cik <- "0001414040"
-  cik_no_pad <- as.character(as.integer(cik))
-  
-  webpage_address_ftp <- paste("ftp://ftp.sec.gov/edgar/data/",cik_no_pad,"/",sep="") 
-  #filenames <- getURL(webpage_address_ftp, ftp.use.epsv = FALSE, ftplistonly = TRUE, crlf = TRUE) 
-  
-  webpage_address_http <- paste("http://www.sec.gov/Archives/edgar/data/",cik_no_pad,"/",sep="") 
-  
-  
-  
-  
-  
-  
-  
-  
-  
+  #Get addresses
+  sub_directory_address_http <- directory_full[i,"Link_HTTP"]
+  sub_directory_address_ftp <- directory_full[i,"Link_FTP"]
+
+
   #Get Directory
-  sub_directory <- directory_listing(directory_full[i,"Link"])
+  sub_directory <- directory_listing(directory_full[i,"Link_HTTP"])
   
   #Clean Directory
   sub_directory <- directory_cleaning(sub_directory)
   
   #Expand Directory
-  sub_directory_full <- directory_expand(sub_directory)
+  sub_directory_full <- directory_expand(sub_directory,sub_directory_address_http,sub_directory_address_ftp)
   
-  #Create Level 2 Directory Links
-  sub_directory_full <- directory_links_L2(sub_directory_full,webpage_address_http,webpage_address_ftp)
-  
+  #Create Accession Number
+  #sub_directory_full <- directory_Accession_num_L2(sub_directory_full)
   
   
 }
