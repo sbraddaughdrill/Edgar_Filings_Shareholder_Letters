@@ -1,6 +1,7 @@
 library(chron)
 library(DataCombine)
 library(gdata)
+library(plyr)
 library(RCurl)
 library(XML)
 
@@ -40,6 +41,8 @@ directory_listing <- function(http_address){
 
 directory_cleaning <- function(directory_df){
   
+  #directory_df <- temp_directory
+  
   for(i in 1:ncol(directory_df))
   {
     directory_df[,i] <- iconv(directory_df[,i], "latin1", "ASCII", sub="")
@@ -57,55 +60,43 @@ directory_cleaning <- function(directory_df){
     directory_df[,i] <- ifelse(is.na(directory_df[,i]),NA, directory_df[,i])
   } 
   
+  #Remove all NA cols
+  directory_df <- directory_df[,colSums(is.na(directory_df[1:nrow(directory_df),]))<nrow(directory_df)]
+  
+  #Remove all NA rows
+  directory_df <- directory_df[rowSums(is.na(directory_df[,1:ncol(directory_df)]))<ncol(directory_df),]
+
+  #Remove parent directory row
+  directory_df <- directory_df[!(directory_df[,"Name"]=="Parent Directory"),]
+  
+  #Remove NA names row
+  directory_df <- directory_df[!(is.na(directory_df[,"Name"])),]
+  
+  #Reorder row numbers
+  row.names(directory_df) <- seq(nrow(directory_df))
+  
+  for(i in which(sapply(directory_df,class)=="character"))
+  {
+    directory_df[[i]] = trim(directory_df[[i]])
+  }
+  for (i in 1:ncol(directory_df))
+  {
+    #i <- 1
+    #i <- 2
+    directory_df[,i] <- unknownToNA(directory_df[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                                                NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                                                NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+  } 
+  for(i in which(sapply(directory_df,class)=="character"))
+  {
+    #i <- 1
+    directory_df[[i]] <- ifelse(is.na(directory_df[[i]]),NA, directory_df[[i]])
+  }
+  
   return(directory_df)
 }
 
-directory_expand <- function(directory_df,http_address,ftp_address){
-  temp_directory_full <- data.frame(CIK=cik,
-                                    CIK_no_pad=cik_no_pad,
-                                    Accession_num=NA,
-                                    Name=directory_df[,"Name"],                           
-                                    Last_Modified=directory_df[,"Last.modified"],                          
-                                    Size=directory_df[,"Size"],                            
-                                    Description=directory_df[,"Description"], 
-                                    Link_HTTP=NA,
-                                    Link_FTP=NA,
-                                    stringsAsFactors=FALSE)
-  
-  #Remove all NA rows
-  temp_directory_full <- temp_directory_full[rowSums(is.na(temp_directory_full[,1:ncol(temp_directory_full)]))<ncol(temp_directory_full),]
-  
-  #Remove parent directory row
-  temp_directory_full <- temp_directory_full[!(temp_directory_full[,"Name"]=="Parent Directory"),]
-  
-  #Remove NA names row
-  temp_directory_full <- temp_directory_full[!(is.na(temp_directory_full[,"Name"])),]
-  
-  #Reorder row numbers
-  row.names(temp_directory_full) <- seq(nrow(temp_directory_full))
-  
-  #Convert Last_Modified to Date
-  temp_directory_full[,"Last_Modified"] <- as.POSIXct(temp_directory_full[,"Last_Modified"], format="%d-%b-%Y %H:%M")
-  
-  temp_directory_full[,"Description"] <- ifelse(is.na(temp_directory_full[,"Description"]),"Directory", temp_directory_full[,"Description"])
-  
-  #Standardize size to bytes
-  temp_directory_full[,"Size"] <- ifelse(temp_directory_full[,"Size"]=="-",NA, temp_directory_full[,"Size"])
-  temp_directory_full[,"Size"] <- convb(temp_directory_full[,"Size"])
-  
-  #Create Link
-  #temp_directory_full[,"Link"] <- ifelse(temp_directory_full[,"Description"]=="Directory",
-  #                                paste(http_address,temp_directory_full[,"Name"],sep=""),
-  #                                paste(ftp_address,temp_directory_full[,"Name"],sep=""))
-  
-  temp_directory_full[,"Link_HTTP"] <- paste(http_address,temp_directory_full[,"Name"],sep="")
-  temp_directory_full[,"Link_FTP"] <- paste(ftp_address,temp_directory_full[,"Name"],sep="")
-  
-  
-  return(temp_directory_full)
-}
-
-directory_Accession_num_L1 <- function(directory_df)
+directory_Accession_num_L1 <- function(directory_df){
   
   #Accession string positions and lengths
   Accession_start1 <- 0
@@ -123,7 +114,7 @@ directory_Accession_num_L1 <- function(directory_df)
   
 
   
-  return(directory_df)
+  #return(directory_df)
 }
 
 directory_Accession_num_L2 <- function(directory_df){
@@ -142,7 +133,7 @@ directory_Accession_num_L2 <- function(directory_df){
   #                                          substring(gsub(pattern="-", replacement="", directory_df[,"Name"]), Accession_start3, Accession_start3+Accession_length3),
   #                                          sep="-")
   
-  return(directory_df)
+  #return(directory_df)
 }
 
 
@@ -150,104 +141,166 @@ directory_Accession_num_L2 <- function(directory_df){
 cat("SECTION: PREALLOCATE DATA", "\n")
 ############################################################################### 
 
-#Create base column table
-#temp_data_cols <- as.data.frame(matrix(NA, ncol=7, nrow=200),stringsAsFactors=FALSE)
-#colnames(temp_data_cols) <- c("order","isnum","ischar","isdate","isfactor","colnames","desc")
-#temp_data_cols[,1] <- as.numeric(temp_data_cols[,1])
-#temp_data_cols[,2] <- as.numeric(temp_data_cols[,2])
-#temp_data_cols[,3] <- as.numeric(temp_data_cols[,3])
-#temp_data_cols[,4] <- as.numeric(temp_data_cols[,4])
-#temp_data_cols[,5] <- as.numeric(temp_data_cols[,5])
-#temp_data_cols[,6] <- as.character(temp_data_cols[,6])
-#temp_data_cols[,7] <- as.character(temp_data_cols[,7])
+directory_level1_cols <- c("CIK","CIK_no_pad","Directory_Address_HTTP","Directory_Address_FTP","Accession_Num",
+                           "Name","Last_Modified","Size","Description","Sub_Link_HTTP","Sub_Link_FTP")
+directory_level1 <- data.frame(matrix(NA, nrow = 5000, ncol = 11,dimnames = list(NULL,directory_level1_cols)),
+                               stringsAsFactors=FALSE)
 
+directory_level2_cols <- c("CIK","CIK_no_pad","Directory_Address_HTTP","Directory_Address_FTP","Accession_Num",
+                           "Name","Last_Modified","Size","Description","Sub_Link_HTTP","Sub_Link_FTP")
+directory_level2 <- data.frame(matrix(NA, nrow = 20000, ncol = 11,dimnames = list(NULL,directory_level2_cols)),
+                               stringsAsFactors=FALSE)
 
-#Level 1 Directory table
-#directory_level1_cols_count <- 9
-#directory_level1_cols <- temp_data_cols[1:directory_level1_cols_count,]
-#directory_level1_cols[1,] <- data.frame(order=1,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="CIK","",stringsAsFactors=FALSE)
-#directory_level1_cols[2,] <- data.frame(order=2,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="CIK_no_pad","",stringsAsFactors=FALSE)
-#directory_level1_cols[3,] <- data.frame(order=3,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Accession_num","",stringsAsFactors=FALSE)
-#directory_level1_cols[4,] <- data.frame(order=4,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Name","",stringsAsFactors=FALSE)
-#directory_level1_cols[5,] <- data.frame(order=5,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Last_Modified","",stringsAsFactors=FALSE)
-#directory_level1_cols[6,] <- data.frame(order=6,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Size","",stringsAsFactors=FALSE)
-#directory_level1_cols[7,] <- data.frame(order=7,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Description","",stringsAsFactors=FALSE)
-#directory_level1_cols[8,] <- data.frame(order=8,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Link_HTTP","",stringsAsFactors=FALSE)
-#directory_level1_cols[8,] <- data.frame(order=9,isnum=0,ischar=1,isdate=0,isfactor=0,colnames="Link_FTP","",stringsAsFactors=FALSE)
-#directory_level1 <- as.data.frame(matrix(NA, ncol=directory_level1_cols_count, nrow=100),stringsAsFactors=FALSE)
-#colnames(directory_level1) <- directory_level1_cols[,6]
+###############################################################################
+cat("SECTION: IMPORT CIK CATALOG", "\n")
+###############################################################################
 
+#Get identifiers
+cik <- c("0001414040","0000876603")
 
-directory_level1_cols <- c("CIK","CIK_no_pad","Accession_num","Name","Last_Modified","Size","Description","Link_HTTP","Link_FTP")
-input_df <- data.frame(input,
-                       matrix(NA, nrow = length(input), ncol = 6,dimnames = list(NULL,expanded_cols)),
-                       stringsAsFactors=FALSE)
+cik_catalog <- data.frame(CIK=cik,
+                          CIK_no_pad=NA,
+                          Description="Directory",
+                          Sub_Link_HTTP=NA,
+                          Sub_Link_FTP=NA,
+                          stringsAsFactors=FALSE)
 
+#Remove leading zeros in CIK
+cik_catalog[,"CIK_no_pad"] <- as.character(as.integer(cik_catalog[,"CIK"]))
 
-
-
+#Get addresses
+cik_catalog[,"Sub_Link_HTTP"] <- paste("http://www.sec.gov/Archives/edgar/data/",cik_catalog[,"CIK_no_pad"],"/",sep="") 
+cik_catalog[,"Sub_Link_FTP"] <- paste("ftp://ftp.sec.gov/edgar/data/",cik_catalog[,"CIK_no_pad"],"/",sep="") 
 
 
 ###############################################################################
 cat("SECTION: LEVEL 1 DIRECTORY", "\n")
 ###############################################################################
 
-#Get identifiers
-cik <- "0001414040"
-cik_no_pad <- as.character(as.integer(cik))
+for(i in which(cik_catalog[,"Description"]=="Directory"))
+{
+  #i <- tail(head(which(cik_catalog[,"Description"]=="Directory"),1),1)
+  #i <- tail(head(which(cik_catalog[,"Description"]=="Directory"),2),1)
 
-#Get addresses
-directory_address_http <- paste("http://www.sec.gov/Archives/edgar/data/",cik_no_pad,"/",sep="") 
-directory_address_ftp <- paste("ftp://ftp.sec.gov/edgar/data/",cik_no_pad,"/",sep="") 
+  #Get Directory
+  temp_directory <- directory_listing(cik_catalog[i,"Sub_Link_HTTP"])
+  
+  #Clean Directory
+  temp_directory <- directory_cleaning(temp_directory)
+  
+  #Find first row that is empty in final dataset
+  empty_rows <- which(rowSums(is.na(directory_level1[,1:ncol(directory_level1)]))==ncol(directory_level1))
+  
+  #Add CIK, CIK_no_pad, directory_address_http, & directory_address_ftp to final dataset
+  directory_level1[head(empty_rows,1):(head(empty_rows,1)+nrow(temp_directory)-1),"CIK"] <- cik_catalog[i,"CIK"]
+  directory_level1[head(empty_rows,1):(head(empty_rows,1)+nrow(temp_directory)-1),"CIK_no_pad"] <- cik_catalog[i,"CIK_no_pad"]
+  directory_level1[head(empty_rows,1):(head(empty_rows,1)+nrow(temp_directory)-1),"Directory_Address_HTTP"] <- cik_catalog[i,"Sub_Link_HTTP"]
+  directory_level1[head(empty_rows,1):(head(empty_rows,1)+nrow(temp_directory)-1),"Directory_Address_FTP"] <- cik_catalog[i,"Sub_Link_FTP"]
+  
+  #Add temp directory to final dataset
+  directory_level1[head(empty_rows,1):(head(empty_rows,1)+nrow(temp_directory)-1),c("Name","Last_Modified","Size","Description")] <- temp_directory
+    
+  #Add sub addresses
+  directory_level1[,"Sub_Link_HTTP"] <- ifelse((is.na(directory_level1[,"Directory_Address_HTTP"]) & is.na(directory_level1[,"Name"])),
+                                               NA,
+                                               paste(directory_level1[,"Directory_Address_HTTP"],directory_level1[,"Name"],sep=""))
+  directory_level1[,"Sub_Link_FTP"] <- ifelse((is.na(directory_level1[,"Directory_Address_FTP"]) & is.na(directory_level1[,"Name"])),
+                                               NA,
+                                               paste(directory_level1[,"Directory_Address_FTP"],directory_level1[,"Name"],sep=""))
+  
+}
 
-#Get Directory
-directory <- directory_listing(directory_address_http)
+#Convert Last_Modified to Date
+directory_level1[,"Last_Modified"] <- as.POSIXct(directory_level1[,"Last_Modified"], format="%d-%b-%Y %H:%M")
 
-#Clean Directory
-directory <- directory_cleaning(directory)
+#Standardize size to bytes
+directory_level1[,"Size"] <- ifelse(directory_level1[,"Size"]=="-",NA, directory_level1[,"Size"])
+directory_level1[,"Size"] <- convb(directory_level1[,"Size"])
 
-#Expand Directory
-directory_full <- directory_expand(directory,directory_address_http,directory_address_ftp)
+#Add directory description
+#directory_level1[,"Description"] <- ifelse(is.na(directory_level1[,"Description"]),"Directory", directory_level1[,"Description"])
+directory_level1[,"Description"] <- ifelse((substr(directory_level1[,"Name"], nchar(directory_level1[,"Name"]), nchar(directory_level1[,"Name"]))=="/" & 
+                                              is.na(directory_level1[,"Size"])),"Directory", directory_level1[,"Description"])
 
 #Create Accession Number
-#directory_full <- directory_Accession_num_L1(directory_full)
+#directory_level1 <- directory_Accession_num_L1(directory_level1)
+
+#Remove ALL NA rows
+directory_level1 <- directory_level1[rowSums(is.na(directory_level1[,1:ncol(directory_level1)]))<ncol(directory_level1),]
+
+#Reorder row numbers
+row.names(directory_level1) <- seq(nrow(directory_level1))
+
+#rm(temp_directory)
 
 
 ###############################################################################
 cat("SECTION: LEVEL 2 DIRECTORY", "\n")
 ###############################################################################
 
-for(i in which(directory_full[,"Description"]=="Directory"))
+for(j in which(directory_level1[,"Description"]=="Directory"))
 {
-  #i <- head(which(directory_full[,"Description"]=="Directory"),1)
-
+  #j <- tail(head(which(directory_level1[,"Description"]=="Directory"),1),1)
+  #j <- tail(head(which(directory_level1[,"Description"]=="Directory"),2),1)
+  
   #Get identifiers
-  sub_cik <- directory_full[i,"CIK"]
-  sub_cik_no_pad <- directory_full[i,"CIK_no_pad"]
+  #sub_cik <- directory_level1[j,"CIK"]
+  #sub_cik_no_pad <- directory_level1[j,"CIK_no_pad"]
   
   #Get addresses
-  sub_directory_address_http <- directory_full[i,"Link_HTTP"]
-  sub_directory_address_ftp <- directory_full[i,"Link_FTP"]
-
+  #sub_directory_address_http <- directory_level1[j,"Link_HTTP"]
+  #sub_directory_address_ftp <- directory_level1[j,"Link_FTP"]
 
   #Get Directory
-  sub_directory <- directory_listing(directory_full[i,"Link_HTTP"])
+  temp_sub_directory <- directory_listing(directory_level1[j,"Sub_Link_HTTP"])
   
   #Clean Directory
-  sub_directory <- directory_cleaning(sub_directory)
+  temp_sub_directory <- directory_cleaning(temp_sub_directory)
   
-  #Expand Directory
-  sub_directory_full <- directory_expand(sub_directory,sub_directory_address_http,sub_directory_address_ftp)
+  #Find first row that is empty in final dataset
+  sub_empty_rows <- which(rowSums(is.na(directory_level2[,1:ncol(directory_level2)]))==ncol(directory_level2))
   
-  #Create Accession Number
-  #sub_directory_full <- directory_Accession_num_L2(sub_directory_full)
+  #Add CIK, CIK_no_pad, directory_address_http, & directory_address_ftp to final dataset
+  directory_level2[head(sub_empty_rows,1):(head(sub_empty_rows,1)+nrow(temp_sub_directory)-1),"CIK"] <- directory_level1[j,"CIK"]
+  directory_level2[head(sub_empty_rows,1):(head(sub_empty_rows,1)+nrow(temp_sub_directory)-1),"CIK_no_pad"] <- directory_level1[j,"CIK_no_pad"]
+  directory_level2[head(sub_empty_rows,1):(head(sub_empty_rows,1)+nrow(temp_sub_directory)-1),"Directory_Address_HTTP"] <- directory_level1[j,"Sub_Link_HTTP"]
+  directory_level2[head(sub_empty_rows,1):(head(sub_empty_rows,1)+nrow(temp_sub_directory)-1),"Directory_Address_FTP"] <- directory_level1[j,"Sub_Link_FTP"]
   
+  #Add temp directory to final dataset
+  directory_level2[head(sub_empty_rows,1):(head(sub_empty_rows,1)+nrow(temp_sub_directory)-1),c("Name","Last_Modified","Size","Description")] <- temp_sub_directory
+  
+  #Add sub addresses
+  directory_level2[,"Sub_Link_HTTP"] <- ifelse((is.na(directory_level2[,"Directory_Address_HTTP"]) & is.na(directory_level2[,"Name"])),
+                                               NA,
+                                               paste(directory_level2[,"Directory_Address_HTTP"],directory_level2[,"Name"],sep=""))
+  directory_level2[,"Sub_Link_FTP"] <- ifelse((is.na(directory_level2[,"Directory_Address_FTP"]) & is.na(directory_level2[,"Name"])),
+                                              NA,
+                                              paste(directory_level2[,"Directory_Address_FTP"],directory_level2[,"Name"],sep=""))
   
 }
 
+#Convert Last_Modified to Date
+directory_level2[,"Last_Modified"] <- as.POSIXct(directory_level2[,"Last_Modified"], format="%d-%b-%Y %H:%M")
 
+#Standardize size to bytes
+directory_level2[,"Size"] <- ifelse(directory_level2[,"Size"]=="-",NA, directory_level2[,"Size"])
+directory_level2[,"Size"] <- convb(directory_level2[,"Size"])
 
+#Add directory description
+#directory_level2[,"Description"] <- ifelse(is.na(directory_level2[,"Description"]),"Directory", directory_level2[,"Description"])
+directory_level2[,"Description"] <- ifelse((substr(directory_level2[,"Name"], nchar(directory_level2[,"Name"]), nchar(directory_level2[,"Name"]))=="/" & 
+                                              is.na(directory_level2[,"Size"])),"Directory", directory_level2[,"Description"])
 
+#Create Accession Number
+#directory_level2 <- directory_Accession_num_L2(directory_level2)
+
+#Remove ALL NA rows
+directory_level2 <- directory_level2[rowSums(is.na(directory_level2[,1:ncol(directory_level2)]))<ncol(directory_level2),]
+
+#Reorder row numbers
+row.names(directory_level2) <- seq(nrow(directory_level2))
+
+#rm(temp_sub_directory)
 
 
 
