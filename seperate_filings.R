@@ -22,10 +22,6 @@ library(XML)
 # doc.html.name.value[[1]]
 # 
 
-
-
-
-
 webpage_address <- "ftp://ftp.sec.gov/edgar/data/1414040/0000950136-08-000294.txt" 
 
 webpage <- getURL(webpage_address)

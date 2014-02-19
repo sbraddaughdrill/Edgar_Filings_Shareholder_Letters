@@ -135,7 +135,7 @@ slash <- "\\"
 #First year you want index files for:
 startyear <- 1993
 #Last year you want index files for:
-endyear <- 2012
+endyear <- 2013
 #First qtr you want index files for (usually 1):
 startqtr <- 1
 #Last qtr you want index files for (usually 4):
