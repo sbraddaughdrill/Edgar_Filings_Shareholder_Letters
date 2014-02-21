@@ -33,7 +33,7 @@ options(max.print = 500)
 #memory.limit(size = 8183)
 
 # Set location (1=HOME,2=WORK,3=CORALSEA FROM HOME,4=CORALSEA FROM WORK) Location <- 1
-Location <- 1
+Location <- 2
 
 if (Location == 1) {
   #setwd("C:/Research_temp3/")
@@ -134,11 +134,11 @@ slash <- "\\"
 #First year you want index files for:
 
 #startyear <- 1993
-startyear <- 2008
+startyear <- 2006
 
 #Last year you want index files for:
 #endyear <- 2012
-endyear <- 2008
+endyear <- 2012
 
 #First qtr you want index files for (usually 1):
 startqtr <- 1
@@ -149,13 +149,14 @@ endqtr <- 4
 #Output folder:
 indexfolder <- "full-index"
 
-downloadfolder <- "N-1"
+#downloadfolder <- "N-1"
+downloadfolder <- "DEF 14A"
 
 #The sub directory you are going to download filings to
 originalfolder <- "original"
 
 #The file that will contain the filings you want to download.
-outfile <- "getfiles.txt"
+outfile <- "yearly_filings.csv"
 
 #Specifiy, in regular expression format, the filing you are looking for.
 #Following is the for 10-k.
@@ -164,7 +165,9 @@ outfile <- "getfiles.txt"
 #I also want to exclude amended filings so I specify that 10-k should not be followed by / (e.g., 10-K/A).
 
 #formget <- '(N-1  |N-1/A  |N-1/A  |N-1A  |N-1A/A  |N-1A EL  |N-1A EL/A  |497K  |497K1  |497K2  |497K3A  |497K3B  )'
-formget <- c("N-1","N-1/A","N-1/A","N-1A","N-1A/A","N-1A EL","N-1A EL/A","497K","497K1","497K2","497K3A","497K3B")
+#formget <- c("N-1","N-1/A","N-1/A","N-1A","N-1A/A","N-1A EL","N-1A EL/A","497K","497K1","497K2","497K3A","497K3B")
+formget <- c("DEF 14A")
+
 
 #FTP address
 ftp <- "ftp.sec.gov"
@@ -216,13 +219,17 @@ summary <- summary[!(summary[,"yr"]==endyear & summary[,"qtr"]>endqtr),]
 row.names(summary) <- seq(nrow(summary))
 
 
+cik_list <- data.frame(CIK=NA,
+                       CIK_no_pad=NA,                                
+                       stringsAsFactors=FALSE)
+
 #Get filings
 yr <- startyear
 qtr <- startqtr
 
 for (yr in startyear:endyear)
 {
-  #yr <- 2008
+  #yr <- 2005
   
   cat(yr,"\n")
   
@@ -261,9 +268,9 @@ for (yr in startyear:endyear)
     close(con)
     
     #Convert to data.frame
-    expanded_cols <- c("company_name","form_type","cik","file_date","fullfilename","good_filing_flag")
+    expanded_cols <- c("company_name","form_type","cik","file_date","fullfilename_txt","fullfilename_htm","good_filing_flag")
     input_df <- data.frame(input,
-                           matrix(NA, nrow = length(input), ncol = 6,dimnames = list(NULL,expanded_cols)),
+                           matrix(NA, nrow = length(input), ncol = 7,dimnames = list(NULL,expanded_cols)),
                            stringsAsFactors=FALSE)
     
     #Populate new columns
@@ -271,8 +278,9 @@ for (yr in startyear:endyear)
     input_df[,"form_type"] <- substring(input_df[,"input"], form_type_start, form_type_start+form_type_length)
     input_df[,"cik"] <- substring(input_df[,"input"], cik_start, cik_start+cik_length)
     input_df[,"file_date"] <- substr(input_df[,"input"], file_date_start, file_date_start+file_date_length)
-    input_df[,"fullfilename"] <- substr(input_df[,"input"], fullfilename_start, fullfilename_start+fullfilename_length)
-    
+    input_df[,"fullfilename_txt"] <- substr(input_df[,"input"], fullfilename_start, fullfilename_start+fullfilename_length)
+    input_df[,"fullfilename_htm"] <- input_df[,"fullfilename_txt"] 
+  
     #Format new columns
     for (i in expanded_cols)
     {
@@ -290,7 +298,28 @@ for (yr in startyear:endyear)
     input_df[,"good_filing_flag"] <- ifelse(is.na(input_df[,"form_type"]), NA, 0)
     input_df[,"good_filing_flag"] <- ifelse(input_df[,"form_type"] %in% formget, 1, input_df[,"good_filing_flag"])
     
-    good_filings <- input_df[(!is.na(input_df[,"good_filing_flag"]) & input_df[,"good_filing_flag"]==1),"fullfilename"]
+    input_df[,"fullfilename_htm"] <- gsub(".txt","",input_df[,"fullfilename_htm"])
+    
+    input_df[,"fullfilename_htm"] <- paste(gsub(".txt","",input_df[,"fullfilename_htm"]),"-index.htm",sep="")
+    
+    good_filings <- input_df[(!is.na(input_df[,"good_filing_flag"]) & input_df[,"good_filing_flag"]==1),]
+    good_filings <- subset(good_filings,select=-c(input))
+    #row.names(good_filings) <- seq(nrow(good_filings))
+    
+    good_filings[,"file_date"] <- as.character(good_filings[,"file_date"])
+    good_filings[,"good_filing_flag"] <- as.character(good_filings[,"good_filing_flag"])
+    
+    write.table(good_filings,file=ofidx,na="",sep=",",quote=TRUE,row.names=FALSE,col.names=FALSE,append=TRUE)
+    unique_cik <- unique(good_filings[,"cik"])
+    
+    if (length(unique_cik) != 0)
+    {
+      cik_list <- rbind(cik_list,data.frame(CIK=NA,CIK_no_pad=unique_cik,stringsAsFactors=FALSE))   
+      
+    } else
+    {
+      cat( "\n", "No Desired Filings in", yr,",qtr",qtr, "\n") 
+    }
     
     #Open the file you want to write to.  The first time through the file is opened to "replace" the existing file.
     #After that, it is opened to append .
@@ -308,7 +337,7 @@ for (yr in startyear:endyear)
     #       
     #     }
     
-    write(good_filings,ofidx,append=TRUE)
+    #write(good_filings,ofidx,append=TRUE)
     
     
     #Put count in summary table
@@ -316,17 +345,55 @@ for (yr in startyear:endyear)
     
   } 
   
+  
+  #Clean table
+  filings_org <- read.csv(ofidx,na.strings = "NA",header = FALSE)
+  filings_df <- data.frame(lapply(filings_org, as.character), stringsAsFactors=FALSE)
+  colnames(filings_df) <- c("company_name","form_type","cik","file_date","fullfilename_txt","fullfilename_htm","good_filing_flag")
+  
+  filings_u <- filings_df
+  filings_u <- filings_u[!(filings_u[,"company_name"])=="company_name",]
+  filings_u <- filings_u[!(filings_u[,"form_type"])=="form_type",]
+  filings_u <- filings_u[!(filings_u[,"cik"])=="cik",]
+  filings_u <- filings_u[!(filings_u[,"fullfilename_txt"])=="fullfilename_txt",]
+  filings_u <- filings_u[!(filings_u[,"fullfilename_htm"])=="fullfilename_htm",]
+  filings_u <- filings_u[!(filings_u[,"good_filing_flag"])=="good_filing_flag",]
+  
+  for(i in which(sapply(filings_u,class)=="character"))
+  {
+    filings_u[[i]] = trim(filings_u[[i]])
+  }
+  for (i in 1:ncol(filings_u))
+  {
+    
+    filings_u[,i] <- unknownToNA(filings_u[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                                                NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                                                NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+  } 
+  filings_u <- unique(filings_u)
+  row.names(filings_u) <- seq(nrow(filings_u))
+  
+  #Fix columns
+  filings_u[,"file_date"] <- as.Date(filings_u[,"file_date"],format="%Y-%m-%d")
+  filings_u[,"good_filing_flag"] <- as.numeric(filings_u[,"good_filing_flag"])
+  
+  #Output cleaned table
+  write.csv(filings_u,file=ofidx,na="",quote=TRUE,row.names=FALSE)
+  
+  
+  
+  
   #Get name of all files already downloaded
   old <- list.files(original_folder_path)
   
   #Get the names of the files to download
-  ocon <- file(ofidx, 'r') 
-  files_to_download <- data.frame(fullfilename=readLines(ocon),
+  #ocon <- file(ofidx, 'r') 
+  files_to_download <- data.frame(fullfilename=filings_u[,"fullfilename_txt"],
                                   filename_start=NA,
                                   filename=NA,
                                   already_downloaded=NA,
                                   stringsAsFactors=FALSE)
-  close(ocon)
+  #close(ocon)
   
   #Find starting position of file name
   #files_to_download[,"filename_start"] <- regexpr("\\.[^\\.]*$", files_to_download[,"fullfilename"])
@@ -348,6 +415,8 @@ for (yr in startyear:endyear)
     fileout <- paste(original_folder_path,files_to_download[i,"filename"],sep=slash)
     
     download.file(paste("ftp://",ftp,"/",files_to_download[i,"fullfilename"],sep=""), fileout, quiet = FALSE, mode = "wb",cacheOK = TRUE)
+    
+    cat("File",i,"of",length(which(files_to_download[,"already_downloaded"]==0)),"\n")
 
   } 
   
