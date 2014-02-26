@@ -173,12 +173,14 @@ webpage_sep[,"Final_tag"] <- ifelse(webpage_sep[,"Good"]==1,
                                     paste(webpage_sep[,"raw_encoded"],"</",webpage_sep[,"tag_short"],">",sep=""))
 
 data <- webpage_sep[,"Final_tag"]
+#data <- webpage_sep[c(38:214),"Final_tag"]
+#data <- webpage_sep[c(39:47),"Final_tag"]
 
 data_parse <- xmlTreeParse(data,useInternalNodes = TRUE, options = HUGE, isSchema=FALSE)
 #data_parse <- xmlTreeParse(data,useInternalNodes = FALSE, options = HUGE, isSchema=FALSE)
 
 
-
+test_df <- xmlToDataFrame(data_parse)
 
 
 
