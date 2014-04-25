@@ -571,3 +571,65 @@ doc <- xmlTreeParse(data, asTree=TRUE,handlers = list(variable=function(x, attrs
 # # test <- xpathSApply(webpage, "//document", xmlValue)
 # 
 # # readKeyValueDB(url)
+
+
+#####################################################
+
+library(XBRL)
+library(sqldf)
+
+ko = "http://www.sec.gov/Archives/edgar/data/21344/000002134413000050/ko-20130927.xml"
+#ko = "http://www.sec.gov/Archives/edgar/data/1414040/000141404014000007/0001414040-14-000007.hdr.sgml"
+
+xbrl.vars <- xbrlDoAll(ko, verbose=TRUE)
+
+
+
+###combine things
+
+
+xbrl_to_df = function(xbrl.vars){
+  name_list = names(xbrl.vars)
+  for(nom in name_list){
+    eval(parse(text=paste0("df_",nom,"= xbrl.vars$",nom)))
+    
+  }
+  big_data_frame = sqldf('select a.elementid, a.contextid, a.unitid, a.fact, a.decimals, a.factid, b.startdate,         b.enddate, b.dimension1, b.value1, b.dimension2, b.value2, b.dimension3, b.value3, b.dimension4, b.value4,     c.footnoteString
+
+      from df_fact a left join df_context b on a.contextid = b.contextid left join df_footnote c on     c.factid=a.factid ')
+  
+  return(big_data_frame)
+  
+  
+}
+
+my_data = xbrl_to_df(xbrl.vars)
+
+
+
+
+
+
+# http://www.sec.gov/Archives/edgar/data/1414040/000141404014000007/
+# http://www.sec.gov/Archives/edgar/data/1414040/
+# http://www.sec.gov/Archives/edgar/data/21344/000002134413000050/ko-20130927.xml
+# http://searchsoa.techtarget.com/definition/SGML
+# http://www.techwr-l.com/archives/9805/techwhirl-9805-01280.html#.U1Xb0_ldWBI
+# http://xml.coverpages.org/grahamTransTools.html
+# http://tolstoy.newcastle.edu.au/R/help/05/01/10243.html
+# https://www.sec.gov/info/edgar/pdsdissemspec910.pdf
+# http://www.sec.gov/edgar/searchedgar/edgarzones.htm
+# http://iangow.wordpress.com/2011/08/29/getting-sec-filing-header-files/
+# http://stackoverflow.com/questions/12412994/use-lxml-to-parse-text-file-with-bad-header-in-python
+# http://www.reddit.com/r/algotrading/comments/23jjji/obtaining_easily_parseable_sec_filings_data/
+
+
+
+
+
+
+
+
+
+
+
