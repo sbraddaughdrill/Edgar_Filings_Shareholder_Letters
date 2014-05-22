@@ -228,7 +228,7 @@ run_directory <- function(input_ds){
 cat("SECTION: IMPORT CIK CATALOG", "\n")
 ###############################################################################
 
-output_directory <- normalizePath("C:/Research_temp3/",winslash="\\", mustWork=TRUE)
+output_directory <- normalizePath("F:/Research_temp3/",winslash="\\", mustWork=TRUE)
 
 cik_catalog_temp <- read.csv(file=paste(output_directory,"MF_CIKs","CIK_list.csv",sep="/"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
 cik_catalog_temp <- as.data.frame(cik_catalog_temp,stringsAsFactors=FALSE)
