@@ -33,13 +33,13 @@ options(max.print = 500)
 #memory.limit(size = 8183)
 
 # Set location (1=HOME,2=WORK,3=CORALSEA FROM HOME,4=CORALSEA FROM WORK) Location <- 1
-Location <- 2
+Location <- 1
 
 if (Location == 1) {
   #setwd("C:/Research_temp3/")
-  input_directory <- normalizePath("C:/Users/Brad/Dropbox/Research/Fund_Letters/Data",winslash="\\", mustWork=TRUE)
-  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("C:/Users/Brad/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
+  input_directory <- normalizePath("C:/Users/S.Brad/Dropbox/Research/Fund_Letters/Data",winslash="\\", mustWork=TRUE)
+  output_directory <- normalizePath("F:/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("C:/Users/S.Brad/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("C:/TreeTagger",winslash="\\", mustWork=TRUE)    
   
 } else if (Location == 2) {
@@ -82,34 +82,6 @@ source(file=paste(function_directory,"functions_statistics.R",sep="\\"),echo=FAL
 source(file=paste(function_directory,"functions_text_analysis.R",sep="\\"),echo=FALSE)
 source(file=paste(function_directory,"functions_utilities.R",sep="\\"),echo=FALSE)
 
-create_directory <- function(path,remove=1){
-  if (file.exists(path)) {
-    
-    if (file.info(path)$isdir) {
-      cat(path,"exists and is a directory. \n")
-      
-    } else {
-      
-      if (remove==1) {
-        cat(path,"exists and is a file.  File will be removed and directory will be created.  \n")
-        file.remove(path)
-        dir.create(path,showWarnings = TRUE)
-        
-      } else {
-        cat(path,"exists and is a file.  File will not be removed and directory will not be created. \n")
-        
-      }
-      
-    }
-    
-  } else {
-    cat(path,"does not exist and will be created. \n")
-    dir.create(path,showWarnings = TRUE)
-    
-  }
-}
-
-
 ###############################################################################
 # LIBRARIES;
 cat("SECTION: LIBRARIES", "\n")
@@ -133,12 +105,12 @@ slash <- "\\"
 
 #First year you want index files for:
 
-#startyear <- 1993
-startyear <- 2006
+startyear <- 1994
+#startyear <- 2006
 
 #Last year you want index files for:
+endyear <- 2013
 #endyear <- 2012
-endyear <- 2012
 
 #First qtr you want index files for (usually 1):
 startqtr <- 1
@@ -150,7 +122,8 @@ endqtr <- 4
 indexfolder <- "full-index"
 
 #downloadfolder <- "N-1"
-downloadfolder <- "DEF 14A"
+#downloadfolder <- "DEF 14A"
+downloadfolder <- "EX"
 
 #The sub directory you are going to download filings to
 originalfolder <- "original"
@@ -166,8 +139,8 @@ outfile <- "yearly_filings.csv"
 
 #formget <- '(N-1  |N-1/A  |N-1/A  |N-1A  |N-1A/A  |N-1A EL  |N-1A EL/A  |497K  |497K1  |497K2  |497K3A  |497K3B  )'
 #formget <- c("N-1","N-1/A","N-1/A","N-1A","N-1A/A","N-1A EL","N-1A EL/A","497K","497K1","497K2","497K3A","497K3B")
-formget <- c("DEF 14A")
-
+#formget <- c("EX-99.1")
+formget <- c("EX*")
 
 #FTP address
 ftp <- "ftp.sec.gov"
@@ -229,6 +202,7 @@ qtr <- startqtr
 
 for (yr in startyear:endyear)
 {
+  #yr <- 1994
   #yr <- 2005
   
   cat(yr,"\n")

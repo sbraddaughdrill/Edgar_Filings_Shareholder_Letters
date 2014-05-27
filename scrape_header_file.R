@@ -1,121 +1,152 @@
-#library(data.table)
 library(gdata)
-#library(HTMLUtils)
 library(plyr)
-#library(R2HTML)
 library(RCurl)
-#library(stringr)
-#library(tm)
-#library(tm.plugin.webmining)
 library(XML)
-#library(XML2R)
+
+directory <- normalizePath("F:/Research_temp3/", winslash = "\\", mustWork = TRUE)
 
 
-
-
-#Good sample
-#good_df <- xmlToDataFrame("c:/temp/sample.xml") 
-
-
+###############################################################################
+cat("SECTION: IMPORT URL", "\n")
+###############################################################################
 
 #Get page
 
 url <- "http://www.sec.gov/Archives/edgar/data/1414040/000141404014000007/0001414040-14-000007.hdr.sgml"
 
 webpage <- getURL(url,encoding="UTF-8")
-webpage2 <- readLines(tc <- textConnection(webpage)); close(tc)
+
+tc <- textConnection(webpage)
+webpage2 <- readLines(tc)
+close(tc)
+
 webpage_org_df <- as.data.frame(webpage2,stringsAsFactors=FALSE)
 colnames(webpage_org_df) <- "raw"
 webpage_org_df[,"raw"] <- toupper(webpage_org_df[,"raw"])
 
-webpage_df_xml_only <- webpage_org_df
-webpage_df_xml_only2 <- webpage_df_xml_only[!(is.na(webpage_df_xml_only) | webpage_df_xml_only=="")]
+webpage_df_xml_only1 <- webpage_org_df
+webpage_df_xml_only2 <- webpage_df_xml_only1[!(is.na(webpage_df_xml_only1) | webpage_df_xml_only1=="")]
 webpage_df_xml_only3 <- gsub("&nbsp;"," ",webpage_df_xml_only2)
 
 webpage_df_xml_only_df <- as.data.frame(webpage_df_xml_only3,stringsAsFactors=FALSE)
 colnames(webpage_df_xml_only_df) <- c("raw")
 
+rm(url,tc,webpage,webpage2,webpage_org_df)
+rm(webpage_df_xml_only1,webpage_df_xml_only2,webpage_df_xml_only3)
+
+
+###############################################################################
+cat("SECTION: FIX TAGS", "\n")
+###############################################################################
 
 #Seperate tags and values
-webpage_sep <- data.frame(tag_status_open=NA,
-                          tag_status_close=NA,
-                          raw=webpage_df_xml_only_df,
-                          raw_encoded=NA,
-                          tag=NA,
-                          tag_short=NA,
-                          type=NA,
-                          value=NA,
-                          stringsAsFactors=FALSE)
+webpage_tags <- data.frame(tag_status_open=NA,
+                           tag_status_close=NA,
+                           raw=webpage_df_xml_only_df,
+                           raw_encoded=NA,
+                           tag=NA,
+                           tag_short=NA,
+                           type=NA,
+                           value=NA,
+                           stringsAsFactors=FALSE)
 #Get Tag
-webpage_sep[,"tag"] <-  gsub(".*?<(.*?)>.*", "\\1", webpage_sep[,"raw"]) 
+webpage_tags[,"tag"] <-  gsub(".*?<(.*?)>.*", "\\1", webpage_tags[,"raw"]) 
 
 #Clean Tag
-for(i in 1:ncol(webpage_sep))
+for(i in 1:ncol(webpage_tags))
 {
-  webpage_sep[,i] <- iconv(webpage_sep[,i], "latin1", "ASCII", sub="")
+  webpage_tags[,i] <- iconv(webpage_tags[,i], "latin1", "ASCII", sub="")
 }
+rm(i)
 
-for(i in which(sapply(webpage_sep,class)=="character"))
+for(i in which(sapply(webpage_tags,class)=="character"))
 {
-  webpage_sep[[i]] = trim(webpage_sep[[i]])
+  webpage_tags[[i]] = trim(webpage_tags[[i]])
 }
-for (i in 1:ncol(webpage_sep))
+rm(i)
+
+for (i in 1:ncol(webpage_tags))
 {
-  webpage_sep[,i] <- unknownToNA(webpage_sep[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                            NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                            NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-  webpage_sep[,i] <- ifelse(is.na(webpage_sep[,i]),NA, webpage_sep[,i])
+  webpage_tags[,i] <- unknownToNA(webpage_tags[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                                              NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                                              NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+  webpage_tags[,i] <- ifelse(is.na(webpage_tags[,i]),NA, webpage_tags[,i])
 } 
+rm(i)
 
 
 #Determine is open/close tag
-webpage_sep[,"type"] <-  ifelse(grepl("/", webpage_sep[,"tag"]), "close", "open")
+webpage_tags[,"type"] <-  ifelse(grepl("/", webpage_tags[,"tag"]), "close", "open")
 
 #Get value
-webpage_sep[,"value"] <- sapply(strsplit(webpage_sep[,"raw"], paste("<",webpage_sep[,"tag"],">",sep="")), "[", 2)
+webpage_tags[,"value"] <- sapply(strsplit(webpage_tags[,"raw"], paste("<",webpage_tags[,"tag"],">",sep="")), "[", 2)
 
-#Remove closing tag from tag_short column
-webpage_sep[,"tag_short"] <- gsub("/", "", webpage_sep[,"tag"])
-
-#Add brackets to tags
-webpage_sep[,"tag"] <- paste("<",webpage_sep[,"tag"],">",sep="")
 
 #Find all possible tags
-tags <- unique(webpage_sep[,"tag_short"])
+raw_tags1 <- data.frame(raw=unique(webpage_tags[,"tag"]),
+                        cleaned=unique(webpage_tags[,"tag"]),
+                        stringsAsFactors=FALSE)
 
-#Count open and closed tags
-tags_df <- data.frame(type=tags,
-                      open_count=NA,
-                      close_count=NA,
-                      stringsAsFactors=FALSE)
+#Replace hyphens
+raw_tags1[,"cleaned"] <- gsub("-","_",raw_tags1[,"cleaned"])
 
-for (i in 1:nrow(tags_df))
+raw_tags1_trim <- raw_tags1[!(raw_tags1[,"raw"]==raw_tags1[,"cleaned"]),]
+row.names(raw_tags1_trim) <- seq(nrow(raw_tags1_trim))
+rm(raw_tags1)
+
+for (i in 1:nrow(raw_tags1_trim))
+{
+  #i <- 1
+  #webpage_tags[,"tag"] <- gsub(raw_tags1_trim[i,"raw"],raw_tags1_trim[i,"cleaned"],webpage_tags[,"tag"])
+  #webpage_tags[,"tag_short"] <- gsub(raw_tags1_trim[i,"raw"],raw_tags1_trim[i,"cleaned"],webpage_tags[,"tag_short"])
+  
+  webpage_tags[,"tag"] <- ifelse(webpage_tags[,"tag"]==raw_tags1_trim[i,"raw"], raw_tags1_trim[i,"cleaned"], webpage_tags[,"tag"])
+  
+} 
+rm(raw_tags1_trim,i)
+
+#Remove closing tag from tag_short column
+webpage_tags[,"tag_short"] <- gsub("/", "", webpage_tags[,"tag"])
+
+#Add brackets to tags
+webpage_tags[,"tag"] <- paste("<",webpage_tags[,"tag"],">",sep="")
+
+#Find all possible tags
+raw_tags2 <- data.frame(cleaned=unique(webpage_tags[,"tag_short"]),
+                        open_count=NA,
+                        close_count=NA,
+                        stringsAsFactors=FALSE)
+
+for (i in 1:nrow(raw_tags2))
 {
   #i <- 1
   
-  webpage_sep[,"tag_status_open"] <- ifelse(grepl(paste("<",tags_df[i,"type"],">",sep=""), webpage_sep[,"raw"]), 1, 0)
-  webpage_sep[,"tag_status_close"] <- ifelse(grepl(paste("</",tags_df[i,"type"],">",sep=""), webpage_sep[,"raw"]), 1, 0)
+  webpage_tags[,"tag_status_open"] <- ifelse(grepl(paste("<",raw_tags2[i,"cleaned"],">",sep=""), webpage_tags[,"tag"]), 1, 0)
+  webpage_tags[,"tag_status_close"] <- ifelse(grepl(paste("</",raw_tags2[i,"cleaned"],">",sep=""), webpage_tags[,"tag"]), 1, 0)
   
-  tags_df[i,"open_count"] <- sum(webpage_sep[,"tag_status_open"])
-  tags_df[i,"close_count"] <- sum(webpage_sep[,"tag_status_close"])
+  raw_tags2[i,"open_count"] <- sum(webpage_tags[,"tag_status_open"])
+  raw_tags2[i,"close_count"] <- sum(webpage_tags[,"tag_status_close"])
   
-  webpage_sep[,"tag_status_open"] <- NA
-  webpage_sep[,"tag_status_close"] <- NA
+  webpage_tags[,"tag_status_open"] <- NA
+  webpage_tags[,"tag_status_close"] <- NA
 } 
+rm(i)
 
 #Find tags that are not closed
-tags_bad <- tags_df[which(tags_df[,"open_count"]-tags_df[,"close_count"] != 0),]
-row.names(tags_bad) <- seq(nrow(tags_bad))
+raw_tags2_bad <- raw_tags2[which(raw_tags2[,"open_count"]-raw_tags2[,"close_count"] != 0),]
+row.names(raw_tags2_bad) <- seq(nrow(raw_tags2_bad))
+rm(raw_tags2)
 
 #Find rows that need to be fixed
-colnames(webpage_sep)[match("tag_status_open",names(webpage_sep))] <- "Final_tag"
-colnames(webpage_sep)[match("tag_status_close",names(webpage_sep))] <- "Good"
+colnames(webpage_tags)[match("tag_status_open",names(webpage_tags))] <- "Final_tag"
+colnames(webpage_tags)[match("tag_status_close",names(webpage_tags))] <- "Good"
 
 #Find tags that need to be closed
-webpage_sep[,"Good"] <- ifelse(webpage_sep[,"tag_short"] %in% tags_bad[,"type"], 0, 1)
+webpage_tags[,"Good"] <- ifelse(webpage_tags[,"tag_short"] %in% raw_tags2_bad[,"cleaned"], 0, 1)
+rm(raw_tags2_bad)
 
 #Encode HTML entities
-entity_encoding <- read.csv(file="C:\\Research_temp3\\Entity_encoding.csv",header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+entity_encoding <- read.csv(file=paste(directory,"Entity_encoding.csv",sep=""),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
 
 #Clean
 entity_encoding_clean <- entity_encoding
@@ -128,6 +159,8 @@ for(i in which(sapply(entity_encoding_clean,class)=="character"))
 {
   entity_encoding_clean[[i]] = trim(entity_encoding_clean[[i]])
 }
+rm(i)
+
 for (i in 1:ncol(entity_encoding_clean))
 {
   entity_encoding_clean[,i] <- unknownToNA(entity_encoding_clean[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
@@ -135,501 +168,390 @@ for (i in 1:ncol(entity_encoding_clean))
                                                                                 NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
   entity_encoding_clean[,i] <- ifelse(is.na(entity_encoding_clean[,i]),NA, entity_encoding_clean[,i])
 } 
-
+rm(i)
 
 entity_encoding_trim <- entity_encoding_clean[(!(is.na(entity_encoding_clean[,"ASCII.Looks.Like"])) & 
                                                  !(is.na(entity_encoding_clean[,"Entity.Encoding"]))),]
 row.names(entity_encoding_trim) <- seq(nrow(entity_encoding_trim))
 
+rm(entity_encoding,entity_encoding_clean)
+
 #Replacement
 for (i in 1:nrow(entity_encoding_trim))
 {
-  webpage_sep[,"value"] <- gsub(entity_encoding_trim[i,"ASCII.Looks.Like"], 
-                                entity_encoding_trim[i,"Entity.Encoding"], 
-                                webpage_sep[,"value"])
+  webpage_tags[,"value"] <- gsub(entity_encoding_trim[i,"ASCII.Looks.Like"], entity_encoding_trim[i,"Entity.Encoding"], webpage_tags[,"value"])
   
 } 
+rm(entity_encoding_trim,i)
+
 #Clean
-for(i in which(sapply(webpage_sep,class)=="character"))
+for(i in which(sapply(webpage_tags,class)=="character"))
 {
-  webpage_sep[[i]] = trim(webpage_sep[[i]])
+  webpage_tags[[i]] = trim(webpage_tags[[i]])
 }
-for (i in 1:ncol(webpage_sep))
+rm(i)
+
+for (i in 1:ncol(webpage_tags))
 {
-  webpage_sep[,i] <- unknownToNA(webpage_sep[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                            NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                            NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-  webpage_sep[,i] <- ifelse(is.na(webpage_sep[,i]),NA, webpage_sep[,i])
+  webpage_tags[,i] <- unknownToNA(webpage_tags[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                                              NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                                              NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+  webpage_tags[,i] <- ifelse(is.na(webpage_tags[,i]),NA, webpage_tags[,i])
 } 
+rm(i)
 
 #Create raw encoded tags
-webpage_sep[,"raw_encoded"] <- ifelse(is.na(webpage_sep[,"value"]),
-                                      webpage_sep[,"tag"], 
-                                      paste(webpage_sep[,"tag"],webpage_sep[,"value"],sep=""))
+webpage_tags[,"raw_encoded"] <- ifelse(is.na(webpage_tags[,"value"]),
+                                       webpage_tags[,"tag"], 
+                                       paste(webpage_tags[,"tag"],webpage_tags[,"value"],sep=""))
 
 #Creat final tags
-webpage_sep[,"Final_tag"] <- ifelse(webpage_sep[,"Good"]==1, 
-                                    webpage_sep[,"raw_encoded"], 
-                                    paste(webpage_sep[,"raw_encoded"],"</",webpage_sep[,"tag_short"],">",sep=""))
-
-data <- webpage_sep[,"Final_tag"]
-#data <- webpage_sep[c(38:214),"Final_tag"]
-#data <- webpage_sep[c(39:47),"Final_tag"]
-
-data_parse <- xmlTreeParse(data,useInternalNodes = TRUE, options = HUGE, isSchema=FALSE)
-#data_parse <- xmlTreeParse(data,useInternalNodes = FALSE, options = HUGE, isSchema=FALSE)
+webpage_tags[,"Final_tag"] <- ifelse(webpage_tags[,"Good"]==1, 
+                                     webpage_tags[,"raw_encoded"], 
+                                     paste(webpage_tags[,"raw_encoded"],"</",webpage_tags[,"tag_short"],">",sep=""))
 
 
-test_df <- xmlToDataFrame(data_parse)
+###############################################################################
+cat("SECTION: SEPERATE SECTIONS", "\n")
+###############################################################################
 
+webpage_sep <- webpage_tags
+webpage_sep[1,"Final_tag"] <- "<SEC_HEADER>"
 
+#Find all possible tags
+sep_tags1 <- data.frame(cleaned=unique(webpage_sep[,"tag_short"]),
+                        open_count=NA,
+                        close_count=NA,
+                        stringsAsFactors=FALSE)
 
-dumFun <- function(x){
-  
-  #x <- getNodeSet(data_parse, paste("//*/","CLASS-CONTRACT",sep=""))[[1]]
-  
-  xname <- xmlName(x)
-  xattrs <- xmlAttrs(x)
-  x_combined <- c(sapply(xmlChildren(x), xmlValue), name = xname, attrs = xattrs)
-  return(x_combined)
-}
-dumFun2 <- function(doc,path){
-  
-  #doc <- data_parse
-  #path <- paste("//","SEC-HEADER",sep="")
-  #path <- paste("//*/","SERIES",sep="")
-  #path <- paste("//*/","CLASS-CONTRACT",sep="")
-  
-  temp1 <- getNodeSet(doc, path)
-  allcols <- unique(unlist(sapply(temp1, names))) 
-  allcols_df <- as.data.frame(allcols, stringsAsFactors = FALSE)
-  allcols_df <- allcols_df[,colnames(unique(as.matrix(allcols_df), MARGIN=2))]
-  
-  for (i in 1:length(temp1))
-  {
-    #i <- 1
-    
-    xname <- xmlName(temp1[[i]])
-    xattrs <- xmlAttrs(temp1[[i]])
-    temp1[[i]] <- c(name = xname, attrs = xattrs, sapply(xmlChildren(temp1[[i]]), xmlValue))
-  } 
-  
-  allcols2 <- c("name","attrs",allcols_df)
-  
-  temp2 <- temp1
-  for (i in 1:length(temp2))
-  {
-    #i <- 1
-    
-    missingColumns <- allcols2[which(!allcols2 %in% names(temp2[[i]]))] 
-    temp2[[i]][missingColumns] <- NA 
-    
-    #temp2[[i]] <- temp2[[i]][order(names(temp2[[i]]))]
-    #temp2[[i]] <- temp2[[i]][sort.list(temp2[[i]])]
-    #order(names(temp2[[i]])) <- allcols2
-    #temp2[[i]] <- temp2[[i]](names("name"))
-    #temp2[[i]][order(names(temp2[[i]]))] <- allcols2
-    #temp2[[i]][names(temp2[[i]])] <- allcols2
-    temp_df <- as.data.frame(temp2[[i]], stringsAsFactors = FALSE)
-    temp2[[i]] <- temp_df[allcols2,]
-    
-  } 
-  
-  temp3 <- do.call(rbind, temp2)
-  temp4 <- as.data.frame(temp3, stringsAsFactors = FALSE)
-  colnames(temp4) <- allcols2
-  return(temp4)
-  
-}
-
-
-test1 <- xmlToDataFrame(data_parse)
-
-#FIRST LEVEL
-
-#test1_sh <-  xmlToDataFrame(getNodeSet(data_parse, paste("//","SEC-HEADER",sep="")), stringsAsFactors = FALSE)
-#test1_sh$Name <- "SEC-HEADER"
-test1_sh <- as.data.frame(t(xpathSApply(data_parse, paste("//","SEC-HEADER",sep=""), dumFun)), stringsAsFactors = FALSE)
-for(i in which(sapply(test1_sh,class)=="character"))
+for (i in 1:nrow(sep_tags1))
 {
-  test1_sh[,i] <- gsub("\n","", test1_sh[,i])
+  #i <- 1
+  #i <- 2
   
-}
-for(i in which(sapply(test1_sh,class)=="character"))
-{
-  test1_sh[[i]] = trim(test1_sh[[i]])
-}
-for (i in 1:ncol(test1_sh))
-{
-  test1_sh[,i] <- unknownToNA(test1_sh[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                            NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                            NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-  test1_sh[,i] <- ifelse(is.na(test1_sh[,i]),NA, test1_sh[,i])
+  webpage_sep[,"tag_status_open"] <- ifelse(grepl(paste("<",sep_tags1[i,"cleaned"],">",sep=""), webpage_sep[,"Final_tag"]), 1, 0)
+  webpage_sep[,"tag_status_close"] <- ifelse(grepl(paste("</",sep_tags1[i,"cleaned"],">",sep=""), webpage_sep[,"Final_tag"]), 1, 0)
+  
+  sep_tags1[i,"open_count"] <- sum(webpage_sep[,"tag_status_open"])
+  sep_tags1[i,"close_count"] <- sum(webpage_sep[,"tag_status_close"])
+  
+  webpage_sep[,"tag_status_open"] <- NA
+  webpage_sep[,"tag_status_close"] <- NA
 } 
-test1_sh <- data.frame(test1_sh, stringsAsFactors = FALSE)
-test1_sh <- test1_sh[,colSums(is.na(test1_sh))<nrow(test1_sh)]
-
-#test1_a_dt <-  xmlToDataFrame(getNodeSet(data_parse, paste("//*/","ACCEPTANCE-DATETIME",sep="")), stringsAsFactors = FALSE)
-#test1_a_num <-  xmlToDataFrame(getNodeSet(data_parse, paste("//*/","ACCESSION-NUMBER",sep="")), stringsAsFactors = FALSE)
-
-#test1_filer <-  xmlToDataFrame(getNodeSet(data_parse, paste("//*/","FILER",sep="")), stringsAsFactors = FALSE)
-#test1_series <-  xmlToDataFrame(getNodeSet(data_parse, paste("//*/","SERIES",sep="")), stringsAsFactors = FALSE)
-#test1_cc <-  xmlToDataFrame(getNodeSet(data_parse, paste("//*/","CLASS-CONTRACT",sep="")), stringsAsFactors = FALSE)
-
-#test1_filer <- as.data.frame(t(xpathSApply(data_parse, paste("//*/","FILER",sep=""), dumFun)), stringsAsFactors = FALSE)
-#test1_series <- as.data.frame(t(xpathSApply(data_parse, paste("//*/","SERIES",sep=""), dumFun)), stringsAsFactors = FALSE)
-
-#test1_sh <- dumFun2(data_parse, paste("//","SEC-HEADER",sep=""))
-test1_a_dt <- dumFun2(data_parse, paste("//*/","ACCEPTANCE-DATETIME",sep=""))
-test1_a_num <- dumFun2(data_parse, paste("//*/","ACCESSION-NUMBER",sep=""))
-
-test1_filer <- dumFun2(data_parse, paste("//*/","FILER",sep=""))
-test1_series <- dumFun2(data_parse, paste("//*/","SERIES",sep=""))
-test1_cc <- dumFun2(data_parse, paste("//*/","CLASS-CONTRACT",sep=""))
+rm(i)
 
 
-
-
-
-
-
-
-aa <- xmlSApply(xmlRoot(data_parse)[[2]], function(x) xmlValue(x[[1]]))
-
-#top <- xmlRoot(data_parse)
-
-i <- 13
-xmlName(xmlRoot(data_parse)[[i]])
-xmlValue(xmlRoot(data_parse)[[i]])
-xmlChildren(xmlRoot(data_parse)[[i]])
-
-
-
-# #Convert to html
-# webpage_html <- htmlTreeParse(webpage_sep[,"raw"],asTree = TRUE, useInternalNodes = TRUE, options = HUGE)
-# saveXML(webpage_html, file="C:\\Research_temp3\\temp.html")
-# 
-# #Open html file
-# webpage3 <- readLines("C:\\Research_temp3\\temp.html")
-# webpage_html_df <- as.data.frame(webpage3,stringsAsFactors=FALSE)
-# colnames(webpage_html_df) <- "raw"
-# #webpage_html_df[,"raw"] <- toupper(webpage_html_df[,"raw"])
-# 
-# tags_html <- tolower(c("HTML","BODY",tags_df[,"type"]))
-# 
-# #Put every tag on new line
-# html_raw <- webpage_html_df[,"raw"]
-# 
-# #Closing Tags
-# for (i in 1:length(tags_html))
-# {
-#   #i <- 1
-#   
-#   #temp <- strsplit(html_raw, paste("</",tags_html[i],">",sep=""), perl = TRUE)
-#   temp <- str_split(html_raw, paste("</",tags_html[i],">",sep=""))
-#   
-#   temp2 <- lapply(temp, function(x,split=paste("</",tags_html[i],">",sep="")){
-#     
-#     if (length(x)>1)
-#     {
-#       x[2:length(x)] <- paste(split,x[2:length(x)],sep="")
-#       return(x)
-#       
-#     } else
-#     {
-#       
-#       return(x)
-#     }
-#   })
-#   temp3 <- trim(temp2)
-#   
-#   #temp4 <- unlist(temp3)
-#   temp4 <- rle(unlist(temp3))$values
-#   temp5 <- as.data.frame(temp4,stringsAsFactors=FALSE)
-#   
-#   html_raw <- temp5[,1]
-# } 
-# 
-# #Opening Tags
-# for (i in 1:length(tags_html))
-# {
-#   #i <- 1
-#   
-#   #temp <- strsplit(html_raw, paste("<",tags_html[i],">",sep=""), perl = TRUE)
-#   temp <- str_split(html_raw, paste("<",tags_html[i],">",sep=""))
-#   
-#   temp2 <- lapply(temp, function(x,split=paste("<",tags_html[i],">",sep="")){
-#     
-#     if (length(x)>1)
-#     {
-#       x[2:length(x)] <- paste(split,x[2:length(x)],sep="")
-#       return(x)
-#       
-#     } else
-#     {
-#       
-#       return(x)
-#     }
-#   })
-#   temp3 <- trim(temp2)
-#   
-#   #temp4 <- unlist(temp3)
-#   temp4 <- rle(unlist(temp3))$values
-#   temp5 <- as.data.frame(temp4,stringsAsFactors=FALSE)
-#   
-#   html_raw <- temp5[,1]
-# 
-# } 
-# 
-# html_expand <- as.data.frame(html_raw,stringsAsFactors=FALSE)
-# 
-# 
-# #Clean HTML Tags
-# for(i in which(sapply(html_expand,class)=="character"))
-# {
-#   html_expand[[i]] = trim(html_expand[[i]])
-# }
-# for (i in 1:ncol(html_expand))
-# {
-#   html_expand[,i] <- unknownToNA(html_expand[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-#                                                             NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-#                                                             NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-#   html_expand[,i] <- ifelse(is.na(html_expand[,i]),NA, html_expand[,i])
-# } 
-# html_expand_trim <- html_expand[!(is.na(html_expand))]
-# html_expand_trim <- as.data.frame(html_expand_trim,stringsAsFactors=FALSE)
-
-
-# html_expand_trim2 <- as.data.frame(html_expand_trim[4:343,1],stringsAsFactors=FALSE)
-# 
-# 
-# #test3 <- xmlToDataFrame(html_expand_trim[,1])
-# test3 <- xmlToDataFrame(html_expand_trim[4:343,1])
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# top <- xmlRoot(UIN_True)
-# top_node <- xmlName(top)
-# #top_node_child_nodes <- as.data.frame(names(top))
-# top_node_child_nodes <- names(top)
-# top_node_child_nodes1 <- names(top[[1]])
-# sec_header <- top[[1]][["sec-header"]]
-# sec_header_child_nodes <- names(sec_header)
-# sec_header_child_nodes1 <- names(sec_header[[1]])
-# sec_header_child_nodes2 <- names(sec_header[[2]])
-# 
-# temp <- xmlSApply(sec_header[[2]], xmlValue)
-# temp2 <- xmlSApply(sec_header, function(x) xmlSApply(x, xmlValue))
-# 
-# 
-# 
-# 
-# 
-# test3 <- xmlParse(data, asText=TRUE, useInternalNodes = FALSE, isSchema=TRUE)
-# test3 <- htmlParse(data, asText=TRUE,useInternalNodes = TRUE, isSchema=TRUE,encoding = "UTF-8")
-# 
-# test3 <- xmlTreeParse(data,asTree = TRUE, useInternalNodes = FALSE, options = HUGE, 
-#              handlers=list(entity=function(x){
-#                cat("In entity",x$name, x$value,"\n")
-#                return(x)
-#                }))
-# 
-# 
-# 
-# 
-# 
-titles = list()
-xmlTreeParse(data, handlers = list(title = function(x){
-  titles[[length(titles) + 1]] <<- x
-}))
-sapply(titles, xmlValue)
-
-
-doc <- xmlTreeParse(data,  handlers = (function() { 
-  vars <- character(0) ;
-  list(variable=function(x, attrs) { 
-    vars <<- c(vars, xmlValue(x[[1]])); 
-    NULL}, 
-    startElement=function(x,attr){
-      NULL
-    }, 
-    names = function() {
-      vars
-    }
-  )
-})()
-)
-doc <- xmlTreeParse(data, asTree=TRUE,handlers = list(variable=function(x, attrs) {
-  #print(xmlValue(x[[1]])) 
-  cat(xmlValue(x[[1]]),"/n") 
-  return(TRUE)
-  }))
-
-
-# #test3 <- htmlParse(data, asText=TRUE,useInternalNodes = TRUE, isSchema=TRUE)
-# #test3a <- xpathApply(test3,"//body//text()",  xmlValue)
-# #test3a <- xpathApply(test3,"//body",  xmlValue)
-# #test3a <- xpathApply(test3,"\n",  xmlValue)
-# #test3a2 <- test3a[[1]]
-# #test3b <- getNodeSet(test3, "//body")
-# #test3b2 <- test3b[[1]]
-# #test3b3 <- xmlValue(test3b2) 
-# 
-# 
-# # getDTD=FALSE, parentFirst=FALSE,isSchema=TRUE,fullNamespaceInfo=TRUE,xinclude=TRUE, asTree=TRUE)
-# 
-# #Default
-# UIN_False <- htmlTreeParse(data, asText=TRUE, useInternalNodes = FALSE, options = HUGE,getDTD=FALSE)
-# UIN_False_sh <- UIN_False$children$html$children$body$children
-# UIN_False_sh_name <- UIN_False_sh[[1]]$name
-# 
-# UIN_False$children[[1]]$name
-# UIN_False$children[[1]]$attributes
-# UIN_False$children[[1]]$children
-# UIN_False$children[[1]]$value
-# 
-# UIN_True <- htmlTreeParse(data, asText=TRUE, useInternalNodes = TRUE, options = HUGE, 
-#                           parentFirst=TRUE,isSchema=TRUE,fullNamespaceInfo=TRUE,xinclude=TRUE,getDTD=FALSE,asTree=TRUE)
-# 
-# UIN_True_node <- getNodeSet(UIN_True, "//body")
-# 
-
-
-
-
-# test4 <- htmlTreeParse(data, asText=TRUE, useInternalNodes = FALSE, options = HUGE, 
-#                        parentFirst=FALSE,isSchema=TRUE,fullNamespaceInfo=TRUE,xinclude=TRUE,getDTD=FALSE,asTree=TRUE)
-# 
-# test4b1 <- getNodeSet(test4, "//body")
-# a <- test4b1[[1]]
-# test4b1 <- getNodeSet(test4, "//body")
-# test4b1[[1]]$XMLInternalNode
-# test4b2 <- xmlValue(test4b1[[1]])
-# #test4b3 <- xmlGetAttr(test4b1[[1]],"class")
-# test4b3 <- xmlAttrs(test4b1[[1]])
-# test4b4 <- xmlName(test4b1[[1]])
-# test4b5 <- xmlChildren(test4b1[[1]])
-# test4b6 <- xmlNamespace(test4b1[[1]])
-# 
-# test4b1[[1]]$XMLNodeList
-# attr(test4b1, XMLNodeList)
-# 
-# temp4c <- xpathSApply(test4,"//body",  xmlValue)
-# temp4d <- xpathSApply(test4,"//body")
-# 
-# #Test stuff
-# xml2r_test <- docsToNodes(test4)
-# xml2r_test2 <-nodesToList(xml2r_test)
-# xml2r_test3 <- listsToObs(xml2r_test2,c(NA,NA,NA))
-# xml2r_test4 <- do.call(rbind, xml2r_test3)
-# 
-# 
-# 
-# #test5 <- htmlTreeParse(data, asText=TRUE,useInternalNodes = FALSE, options = HUGE, isSchema=TRUE)
-# test5 <- htmlTreeParse(data, asText=TRUE,useInternalNodes = FALSE, options = HUGE, isSchema=FALSE)
-# 
-# #test5b <- getNodeSet(test5, "//body")
-# #test5b <- xpathSApply(test5,"//body",  xmlValue)
-# test5b <- test5$children$html
-# test5c <- do.call(rbind, test5b)
-# 
-# as.data.frame(test5$children$html, stringsAsFactors=FALSE)
-# 
-# 
-# body <- test5$children$html$children$body 
-# sec_header <- body$children$sec-header$children
-# 
-# 
-# test6 <- xmlToDataFrame(test5)
-# 
-# 
-# 
-# test7 <- XMLSource(test5)
-# 
-# 
-# 
-# 
-# 
-# #test3a <- xpathApply(test3,"//body//text()",  xmlValue)
-# #test3a <- xpathSApply(test3,"//body//text()",  xmlValue)
-# 
-# # test <- xmlTreeParse(webpage_sep[,"Final_tag"],useInternalNodes = FALSE, options = HUGE)
-# # test <- xmlToDataFrame(webpage_sep[,"Final_tag"])
-# 
-# # test <- xmlEventParse(webpage_sep[,"Final_tag"])
-# # test <- xmlTreeParse(webpage_sep[,"Final_tag"],useInternalNodes = FALSE, options = HUGE)
-# # test <- xmlTreeParse(webpage_sep[,"Final_tag"],useInternalNodes = TRUE, options = HUGE,error=function(e){ cat( "\n") })
-# 
-# # test <- xmlParse(webpage_sep[,"Final_tag"])
-#  
-# # webpage_df2 <- data.frame(webpage_df,document_tag=NA,stringsAsFactors=FALSE)
-# # webpage_df2[,"document_tag"] <- ifelse(grepl("<DOCUMENT>", webpage_df2[,"webpage"]), 1, 0)
-# # test <- xpathSApply(webpage, "//document", xmlValue)
-# 
-# # readKeyValueDB(url)
-
-
-#####################################################
-
-library(XBRL)
-library(sqldf)
-
-ko = "http://www.sec.gov/Archives/edgar/data/21344/000002134413000050/ko-20130927.xml"
-#ko = "http://www.sec.gov/Archives/edgar/data/1414040/000141404014000007/0001414040-14-000007.hdr.sgml"
-
-xbrl.vars <- xbrlDoAll(ko, verbose=TRUE)
-
-
-
-###combine things
-
-
-xbrl_to_df = function(xbrl.vars){
-  name_list = names(xbrl.vars)
-  for(nom in name_list){
-    eval(parse(text=paste0("df_",nom,"= xbrl.vars$",nom)))
-    
-  }
-  big_data_frame = sqldf('select a.elementid, a.contextid, a.unitid, a.fact, a.decimals, a.factid, b.startdate,         b.enddate, b.dimension1, b.value1, b.dimension2, b.value2, b.dimension3, b.value3, b.dimension4, b.value4,     c.footnoteString
-
-      from df_fact a left join df_context b on a.contextid = b.contextid left join df_footnote c on     c.factid=a.factid ')
+for (i in 1:nrow(sep_tags1))
+{
+  #i <- 1
+  #i <- 2
   
-  return(big_data_frame)
+  webpage_sep[,"tag_status_open"] <- ifelse(grepl(paste("<",sep_tags1[i,"cleaned"],">",sep=""), webpage_sep[,"Final_tag"]), 1, 0)
+  webpage_sep[,"tag_status_close"] <- ifelse(grepl(paste("</",sep_tags1[i,"cleaned"],">",sep=""), webpage_sep[,"Final_tag"]), 1, 0)
   
+  sep_tags1[i,"open_count"] <- sum(webpage_sep[,"tag_status_open"])
+  sep_tags1[i,"close_count"] <- sum(webpage_sep[,"tag_status_close"])
   
-}
+  webpage_sep[,"tag_status_open"] <- NA
+  webpage_sep[,"tag_status_close"] <- NA
+} 
+rm(i)
 
-my_data = xbrl_to_df(xbrl.vars)
+sep_tags2 <- sep_tags1[,"cleaned"]
+rm(sep_tags1)
+
+index_temp <- llply(.data=sep_tags2, .fun = function(x,data,tag_col){
+  
+  #x <- sep_tags2[1]
+  #x <- sep_tags2[2]
+  #x <- sep_tags2[34]
+  #data <- webpage_sep
+  #tag_col <- "Final_tag"
+  
+  temp_tag <- data.frame(temp_col=data[,tag_col], 
+                         temp_open_flag=NA,
+                         temp_open_index=NA,
+                         temp_close_flag=NA,
+                         temp_close_index=NA,
+                         temp_diff_flag=NA,
+                         temp_comb_flag=NA,
+                         temp_comb_index=NA, 
+                         stringsAsFactors=FALSE)
+  
+  temp_tag[,"temp_open_flag"] <- ifelse(grepl(paste("<",x,">",sep=""), temp_tag[,"temp_col"]), 1, 0)
+  temp_tag[,"temp_open_index"] <- apply(data.frame(temp_tag[,"temp_open_flag"]), 2, cumsum)
+  
+  temp_tag[,"temp_close_flag"] <- ifelse(grepl(paste("</",x,">",sep=""), temp_tag[,"temp_col"]), 1, 0)
+  temp_tag[,"temp_close_index"] <- apply(data.frame(temp_tag[,"temp_close_flag"]), 2, cumsum)
+  
+  temp_tag[,"temp_diff_flag"] <- (temp_tag[,"temp_open_index"]-temp_tag[,"temp_close_index"])
+  
+  temp_tag[,"temp_comb_flag"] <- (temp_tag[,"temp_close_flag"]+temp_tag[,"temp_diff_flag"])
+  temp_tag[,"temp_comb_index"] <- ifelse(temp_tag[,"temp_comb_flag"]==1, temp_tag[,"temp_open_index"], 0)
+  
+  colnames(temp_tag) <- c(tag_col, 
+                          paste(x,"OPEN_FLAG",sep="_"), paste(x,"OPEN_INDEX",sep="_"),
+                          paste(x,"CLOSE_FLAG",sep="_"), paste(x,"CLOSE_INDEX",sep="_"),
+                          paste(x,"DIFF_FLAG",sep="_"),
+                          paste(x,"COMB_FLAG",sep="_"), paste(x,"COMB_INDEX",sep="_"))
+  
+  output <- temp_tag[,c(paste(x,"COMB_INDEX",sep="_"))]
+  
+  return(output)
+  
+}, data=webpage_sep, tag_col="Final_tag",
+.progress = "none", .inform = FALSE,.parallel = FALSE, .paropts = NULL)
+
+index <- do.call(cbind, index_temp)
+index <- as.data.frame(index,stringsAsFactors=FALSE)
+colnames(index) <- paste(sep_tags2,"INDEX",sep="_")
+
+rm(index_temp)
+
+webpage_sep_index <- data.frame(Final_tag=webpage_sep[,"Final_tag"],index,stringsAsFactors=FALSE)
+
+rm(sep_tags2,webpage_sep,index)
+
+
+###############################################################################
+cat("SECTION: HEADER SECTION", "\n")
+###############################################################################
+
+#Get Class Contract Info
+header_index_val <- "SEC_HEADER"
+header_data_temp <- webpage_sep_index[!(webpage_sep_index[,paste(header_index_val,"INDEX",sep="_")] %in% c(0)),]
+row.names(header_data_temp) <- seq(nrow(header_data_temp))
+
+header_info_sub_index_val <- c("FILER","SERIES_AND_CLASSES_CONTRACTS_DATA")
+header_info <- ddply(.data=header_data_temp, .variables=paste(header_index_val,"INDEX",sep="_"), 
+                     .fun = function(x,xml_col,index_col,sub_index_col){
+                       
+                       # x <- header_data_temp
+                       # xml_col <- "Final_tag"
+                       # index_col <- paste(header_index_val,"INDEX",sep="_")
+                       # sub_index_col <- paste(header_info_sub_index_val,"INDEX",sep="_")
+                       
+                       xml_col_num <- which(colnames(x)==xml_col)
+                       index_col_num <- which(colnames(x)==index_col)
+                       sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
+                       sub_index_col_num_max <- max(sub_index_col_num)
+                       
+                       x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
+
+                       keep_rows <- sort(unique(unlist(lapply(sub_index_col, function(y,data){ which(data[,y]!=0) },data=x_trim))))
+                       drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
+                
+                       x_trim2 <- x_trim[c(1,drop_rows,nrow(x_trim)),]
+
+                       temp_df <- xmlToDataFrame(x_trim2[,xml_col])
+                       
+                     }, xml_col="Final_tag",index_col=paste(header_index_val,"INDEX",sep="_"),
+                     sub_index_col=paste(header_info_sub_index_val,"INDEX",sep="_"), 
+                     .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+
+rm(header_info_sub_index_val)
+rm(header_index_val,header_data_temp)
 
 
 
 
+###############################################################################
+cat("SECTION: FILER SECTION", "\n")
+###############################################################################
+
+filer_index_val <- "FILER"
+filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,paste(filer_index_val,"INDEX",sep="_")] %in% c(0)),]
+row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
+
+filer_company_data_sub_index_val <- "COMPANY_DATA"
+filer_company_data <- ddply(.data=filer_data_temp, .variables=paste(filer_index_val,"INDEX",sep="_"), 
+                            .fun = function(x,xml_col,index_col,sub_index_col){
+                              
+                              # x <- filer_data_temp[filer_data_temp[,paste(filer_index_val,"INDEX",sep="_")]==1,]
+                              # xml_col <- "Final_tag"
+                              # index_col <- paste(filer_index_val,"INDEX",sep="_")
+                              # sub_index_col <- paste(filer_company_data_sub_index_val,"INDEX",sep="_")
+                              
+                              xml_col_num <- which(colnames(x)==xml_col)
+                              index_col_num <- which(colnames(x)==index_col)
+                              sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
+                              sub_index_col_num_max <- max(sub_index_col_num)
+                              
+                              x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
+                              
+                              keep_rows <- sort(unique(unlist(lapply(sub_index_col, function(y,data){ which(data[,y]!=0) },data=x_trim))))
+                              #drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
+                              
+                              x_trim2 <- x_trim[c(1,keep_rows,nrow(x_trim)),]
+                              
+                              temp_df <- xmlToDataFrame(x_trim2[,xml_col])
+                              
+                            }, xml_col="Final_tag",index_col=paste(filer_index_val,"INDEX",sep="_"),
+                            sub_index_col=paste(filer_company_data_sub_index_val,"INDEX",sep="_"), 
+                            .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+
+filer_filing_values_sub_index_val <- "FILING_VALUES"
+filer_filing_values <- ddply(.data=filer_data_temp, .variables=paste(filer_index_val,"INDEX",sep="_"), 
+                             .fun = function(x,xml_col,index_col,sub_index_col){
+                               
+                               xml_col_num <- which(colnames(x)==xml_col)
+                               index_col_num <- which(colnames(x)==index_col)
+                               sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
+                               sub_index_col_num_max <- max(sub_index_col_num)
+                               
+                               x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
+                               
+                               keep_rows <- sort(unique(unlist(lapply(sub_index_col, function(y,data){ which(data[,y]!=0) },data=x_trim))))
+                               #drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
+                               
+                               x_trim2 <- x_trim[c(1,keep_rows,nrow(x_trim)),]
+                               
+                               temp_df <- xmlToDataFrame(x_trim2[,xml_col])
+                               
+                             }, xml_col="Final_tag",index_col=paste(filer_index_val,"INDEX",sep="_"),
+                             sub_index_col=paste(filer_filing_values_sub_index_val,"INDEX",sep="_"), 
+                             .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+
+filer_merge1 <- merge(filer_company_data, filer_filing_values, 
+                      by.x=c(paste(filer_index_val,"INDEX",sep="_")),by.y=c(paste(filer_index_val,"INDEX",sep="_")),
+                      all.x=TRUE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"),incomparables = NA)
+
+rm(filer_company_data_sub_index_val,filer_filing_values_sub_index_val,filer_company_data, filer_filing_values)
+
+filer_business_address_sub_index_val <- "BUSINESS_ADDRESS"
+filer_business_address <- ddply(.data=filer_data_temp, .variables=paste(filer_index_val,"INDEX",sep="_"), 
+                                .fun = function(x,xml_col,index_col,sub_index_col){
+                                  
+                                  xml_col_num <- which(colnames(x)==xml_col)
+                                  index_col_num <- which(colnames(x)==index_col)
+                                  sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
+                                  sub_index_col_num_max <- max(sub_index_col_num)
+                                  
+                                  x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
+                                  
+                                  keep_rows <- sort(unique(unlist(lapply(sub_index_col, function(y,data){ which(data[,y]!=0) },data=x_trim))))
+                                  #drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
+                                  
+                                  x_trim2 <- x_trim[c(1,keep_rows,nrow(x_trim)),]
+                                  
+                                  temp_df <- xmlToDataFrame(x_trim2[,xml_col])
+                                  
+                                }, xml_col="Final_tag",index_col=paste(filer_index_val,"INDEX",sep="_"),
+                                sub_index_col=paste(filer_business_address_sub_index_val,"INDEX",sep="_"), 
+                                .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+
+filer_business_non_index_cols <- colnames(filer_business_address[,!(colnames(filer_business_address) %in% paste(filer_index_val,"INDEX",sep="_"))])
+filer_business_address <- filer_business_address[,c(paste(filer_index_val,"INDEX",sep="_"),filer_business_non_index_cols)]
+colnames(filer_business_address) <- c(paste(filer_index_val,"INDEX",sep="_"),paste(filer_business_non_index_cols,"BUSINESS",sep="_"))
+
+filer_merge2 <- merge(filer_merge1, filer_business_address, 
+                      by.x=c(paste(filer_index_val,"INDEX",sep="_")),by.y=c(paste(filer_index_val,"INDEX",sep="_")),
+                      all.x=TRUE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"),incomparables = NA)
+
+rm(filer_business_address_sub_index_val,filer_business_non_index_cols,filer_merge1,filer_business_address)
+
+filer_mail_address_sub_index_val <- "MAIL_ADDRESS"
+filer_mail_address <- ddply(.data=filer_data_temp, .variables=paste(filer_index_val,"INDEX",sep="_"), 
+                            .fun = function(x,xml_col,index_col,sub_index_col){
+                              
+                              xml_col_num <- which(colnames(x)==xml_col)
+                              index_col_num <- which(colnames(x)==index_col)
+                              sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
+                              sub_index_col_num_max <- max(sub_index_col_num)
+                              
+                              x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
+                              
+                              keep_rows <- sort(unique(unlist(lapply(sub_index_col, function(y,data){ which(data[,y]!=0) },data=x_trim))))
+                              #drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
+                              
+                              x_trim2 <- x_trim[c(1,keep_rows,nrow(x_trim)),]
+                              
+                              temp_df <- xmlToDataFrame(x_trim2[,xml_col])
+                              
+                            }, xml_col="Final_tag",index_col=paste(filer_index_val,"INDEX",sep="_"),
+                            sub_index_col=paste(filer_mail_address_sub_index_val,"INDEX",sep="_"), 
+                            .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+
+filer_mail_non_index_cols <- colnames(filer_mail_address[,!(colnames(filer_mail_address) %in% paste(filer_index_val,"INDEX",sep="_"))])
+filer_mail_address <- filer_mail_address[,c(paste(filer_index_val,"INDEX",sep="_"),filer_mail_non_index_cols)]
+colnames(filer_mail_address) <- c(paste(filer_index_val,"INDEX",sep="_"),paste(filer_mail_non_index_cols,"MAIL",sep="_"))
+
+filer_merge3 <- merge(filer_merge2, filer_mail_address, 
+                      by.x=c(paste(filer_index_val,"INDEX",sep="_")),by.y=c(paste(filer_index_val,"INDEX",sep="_")),
+                      all.x=TRUE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"),incomparables = NA)
+
+rm(filer_mail_address_sub_index_val,filer_mail_non_index_cols,filer_merge2,filer_mail_address)
+rm(filer_index_val,filer_data_temp)
 
 
-# http://www.sec.gov/Archives/edgar/data/1414040/000141404014000007/
-# http://www.sec.gov/Archives/edgar/data/1414040/
-# http://www.sec.gov/Archives/edgar/data/21344/000002134413000050/ko-20130927.xml
-# http://searchsoa.techtarget.com/definition/SGML
-# http://www.techwr-l.com/archives/9805/techwhirl-9805-01280.html#.U1Xb0_ldWBI
-# http://xml.coverpages.org/grahamTransTools.html
-# http://tolstoy.newcastle.edu.au/R/help/05/01/10243.html
-# https://www.sec.gov/info/edgar/pdsdissemspec910.pdf
-# http://www.sec.gov/edgar/searchedgar/edgarzones.htm
-# http://iangow.wordpress.com/2011/08/29/getting-sec-filing-header-files/
-# http://stackoverflow.com/questions/12412994/use-lxml-to-parse-text-file-with-bad-header-in-python
-# http://www.reddit.com/r/algotrading/comments/23jjji/obtaining_easily_parseable_sec_filings_data/
+###############################################################################
+cat("SECTION: SERIES SECTION", "\n")
+###############################################################################
 
+#Get Class Contract Info
+series_index_val <- "SERIES"
+series_data_temp <- webpage_sep_index[!(webpage_sep_index[,paste(series_index_val,"INDEX",sep="_")] %in% c(0)),]
+row.names(series_data_temp) <- seq(nrow(series_data_temp))
 
+series_other_sub_index_val <- "CLASS_CONTRACT"
+series_other <- ddply(.data=series_data_temp, .variables=paste(series_index_val,"INDEX",sep="_"), 
+                      .fun = function(x,xml_col,index_col,sub_index_col){
+                        
+                        # x <- series_data_temp[series_data_temp[,paste(series_index_val,"INDEX",sep="_")]==1,]
+                        # xml_col <- "Final_tag"
+                        # index_col <- paste(series_index_val,"INDEX",sep="_")
+                        # sub_index_col <- paste(series_class_contract_sub_index_val,"INDEX",sep="_")
+                        
+                        xml_col_num <- which(colnames(x)==xml_col)
+                        index_col_num <- which(colnames(x)==index_col)
+                        sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
+                        sub_index_col_num_max <- max(sub_index_col_num)
+                        
+                        x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
+                        
+                        keep_rows <- sort(unique(unlist(lapply(sub_index_col, function(y,data){ which(data[,y]!=0) },data=x_trim))))
+                        drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
+                        
+                        x_trim2 <- x_trim[c(1,drop_rows,nrow(x_trim)),]
+                        
+                        temp_df <- xmlToDataFrame(x_trim2[,xml_col])
+                        
+                      }, xml_col="Final_tag",index_col=paste(series_index_val,"INDEX",sep="_"),
+                      sub_index_col=paste(series_other_sub_index_val,"INDEX",sep="_"), 
+                      .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
 
+series_class_contract_sub_index_val <- "CLASS_CONTRACT"
+series_class_contract <- ddply(.data=series_data_temp, .variables=paste(series_index_val,"INDEX",sep="_"), 
+                               .fun = function(x,xml_col,index_col,sub_index_col){
+                                 
+                                 # x <- series_data_temp[series_data_temp[,paste(series_index_val,"INDEX",sep="_")]==1,]
+                                 # xml_col <- "Final_tag"
+                                 # index_col <- paste(series_index_val,"INDEX",sep="_")
+                                 # sub_index_col <- paste(series_class_contract_sub_index_val,"INDEX",sep="_")
+                                 
+                                 xml_col_num <- which(colnames(x)==xml_col)
+                                 index_col_num <- which(colnames(x)==index_col)
+                                 sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
+                                 sub_index_col_num_max <- max(sub_index_col_num)
+                                 
+                                 x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
+                                 
+                                 keep_rows <- sort(unique(unlist(lapply(sub_index_col, function(y,data){ which(data[,y]!=0) },data=x_trim))))
+                                 #drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
+                                 
+                                 x_trim2 <- x_trim[c(1,keep_rows,nrow(x_trim)),]
+                                 
+                                 temp_df <- xmlToDataFrame(x_trim2[,xml_col])
+                                 
+                               }, xml_col="Final_tag",index_col=paste(series_index_val,"INDEX",sep="_"),
+                               sub_index_col=paste(series_class_contract_sub_index_val,"INDEX",sep="_"), 
+                               .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
 
+series_merge1 <- merge(series_other,series_class_contract,
+                       by.x=c(paste(series_index_val,"INDEX",sep="_")),by.y=c(paste(series_index_val,"INDEX",sep="_")),
+                       all.x=TRUE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"),incomparables = NA)
 
-
-
-
-
+rm(series_class_contract_sub_index_val,series_other_sub_index_val,series_class_contract,series_other)
+rm(series_index_val,series_data_temp)
 
 

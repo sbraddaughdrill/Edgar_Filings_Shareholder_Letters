@@ -1,0 +1,12 @@
+http://www.sec.gov/Archives/edgar/data/1414040/000141404014000007/
+http://www.sec.gov/Archives/edgar/data/1414040/
+http://www.sec.gov/Archives/edgar/data/21344/000002134413000050/ko-20130927.xml
+http://searchsoa.techtarget.com/definition/SGML
+http://www.techwr-l.com/archives/9805/techwhirl-9805-01280.html#.U1Xb0_ldWBI
+http://xml.coverpages.org/grahamTransTools.html
+http://tolstoy.newcastle.edu.au/R/help/05/01/10243.html
+https://www.sec.gov/info/edgar/pdsdissemspec910.pdf
+http://www.sec.gov/edgar/searchedgar/edgarzones.htm
+http://iangow.wordpress.com/2011/08/29/getting-sec-filing-header-files/
+http://stackoverflow.com/questions/12412994/use-lxml-to-parse-text-file-with-bad-header-in-python
+http://www.reddit.com/r/algotrading/comments/23jjji/obtaining_easily_parseable_sec_filings_data/
