@@ -54,15 +54,15 @@ if (Location == 1) {
   #setwd("//tsclient/C/Research_temp3/")
   input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data", winslash = "\\", mustWork = TRUE)
   #output_directory <- normalizePath("//tsclient/C/Research_temp3", winslash = "\\", mustWork = TRUE)
-  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
-  function_directory <- normalizePath("//tsclient/C/Users/Brad/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
+  output_directory <- normalizePath("C:/Users/bdaughdr/Documents/Research_temp3",winslash="\\", mustWork=TRUE)
+  function_directory <- normalizePath("//tsclient/C/Users/S.Brad/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("//tsclient/C/TreeTagger",winslash="\\", mustWork=TRUE)    
   
 } else if (Location == 4) {
   #setwd("//tsclient/C/Research_temp3/")
   input_directory <- normalizePath("H:/Research/Mutual_Fund_Letters/Data", winslash = "\\", mustWork = TRUE)
   #output_directory <- normalizePath("//tsclient/C/Research_temp3", winslash = "\\", mustWork = TRUE)
-  output_directory <- normalizePath("C:/Research_temp3",winslash="\\", mustWork=TRUE)
+  output_directory <- normalizePath("C:/Users/bdaughdr/Documents/Research_temp3",winslash="\\", mustWork=TRUE)
   function_directory <- normalizePath("//tsclient/C/Users/bdaughdr/Dropbox/Research_Methods/R", winslash = "\\", mustWork = TRUE)
   treetag_directory <- normalizePath("//tsclient/C/TreeTagger",winslash="\\", mustWork=TRUE)       
   
@@ -78,9 +78,9 @@ rm(Location)
 cat("SECTION: FUNCTIONS", "\n")
 ###############################################################################
 
-source(file=paste(function_directory,"functions_db.R",sep="\\"),echo=FALSE)
-source(file=paste(function_directory,"functions_statistics.R",sep="\\"),echo=FALSE)
-source(file=paste(function_directory,"functions_text_analysis.R",sep="\\"),echo=FALSE)
+#source(file=paste(function_directory,"functions_db.R",sep="\\"),echo=FALSE)
+#source(file=paste(function_directory,"functions_statistics.R",sep="\\"),echo=FALSE)
+#source(file=paste(function_directory,"functions_text_analysis.R",sep="\\"),echo=FALSE)
 source(file=paste(function_directory,"functions_utilities.R",sep="\\"),echo=FALSE)
 
 ###############################################################################

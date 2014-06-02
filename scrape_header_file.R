@@ -26,7 +26,7 @@ webpage_org_df[,"raw"] <- toupper(webpage_org_df[,"raw"])
 
 webpage_df_xml_only1 <- webpage_org_df
 webpage_df_xml_only2 <- webpage_df_xml_only1[!(is.na(webpage_df_xml_only1) | webpage_df_xml_only1=="")]
-webpage_df_xml_only3 <- gsub("&nbsp;"," ",webpage_df_xml_only2)
+webpage_df_xml_only3 <- gsub("&NBSP;"," ",webpage_df_xml_only2)
 
 webpage_df_xml_only_df <- as.data.frame(webpage_df_xml_only3,stringsAsFactors=FALSE)
 colnames(webpage_df_xml_only_df) <- c("raw")
@@ -55,7 +55,7 @@ webpage_tags[,"tag"] <-  gsub(".*?<(.*?)>.*", "\\1", webpage_tags[,"raw"])
 #Clean Tag
 for(i in 1:ncol(webpage_tags))
 {
-  webpage_tags[,i] <- iconv(webpage_tags[,i], "latin1", "ASCII", sub="")
+  webpage_tags[,i] <- iconv(webpage_tags[,i], "latin1", "ASCII", sub=" ")
 }
 rm(i)
 
