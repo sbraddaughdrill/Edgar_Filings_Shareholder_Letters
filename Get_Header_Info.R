@@ -79,728 +79,8 @@ cat("SECTION: FUNCTIONS", "\n")
 #source(file=paste(function_directory,"functions_db.R",sep="\\"),echo=FALSE)
 #source(file=paste(function_directory,"functions_statistics.R",sep="\\"),echo=FALSE)
 #source(file=paste(function_directory,"functions_text_analysis.R",sep="\\"),echo=FALSE)
+source(file=paste(function_directory,"functions_text_parse.R",sep="\\"),echo=FALSE)
 source(file=paste(function_directory,"functions_utilities.R",sep="\\"),echo=FALSE)
-
-import_local_edgar_file <- function(file){
-  
-  #file <- filepath
-  
-  #webpage <- read.table(file=file,header = FALSE, na.strings="NA",stringsAsFactors=FALSE,  sep = "", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-  #webpage <- read.table(file=file,header = FALSE, na.strings="",sep="\t",stringsAsFactors=FALSE)
-  webpage <- read.table(file=file,header = FALSE, na.strings="",sep="\n",stringsAsFactors=FALSE)
-  
-  webpage2 <- unlist(strsplit(webpage[,1], "\n"))
-  webpage2 <- as.data.frame(webpage2,stringsAsFactors=FALSE)
-  
-  webpage2_row_count <- length(count.fields(file=file, sep = "\n"))
-
-  if(nrow(webpage2)!=webpage2_row_count) { cat("ROW COUNTS NOT EQUAL","\n") }
-  
-  webpage_org_df <- as.data.frame(webpage2,stringsAsFactors=FALSE)
-  colnames(webpage_org_df) <- "raw"
-  webpage_org_df[,"raw"] <- toupper(webpage_org_df[,"raw"])
-  
-  webpage_df_xml_only1 <- webpage_org_df
-  webpage_df_xml_only2 <- webpage_df_xml_only1[!(is.na(webpage_df_xml_only1) | webpage_df_xml_only1=="")]
-  
-  webpage_df_xml_only_df <- as.data.frame(webpage_df_xml_only2,stringsAsFactors=FALSE)
-  colnames(webpage_df_xml_only_df) <- c("raw")
-  
-  return(webpage_df_xml_only_df)
-  
-}  
-
-fix_edgar_tags <- function(file,entity_encoding){
-  
-  #file <- webpage_df_xml_only_df[,"raw"]
-  #entity_encoding <- entity_encoding_trim
-  
-  require(gdata)
-  
-  #Seperate tags and values
-  webpage_tags <- data.frame(tag_status_open=NA,
-                             tag_status_close=NA,
-                             raw=file,
-                             raw_encoded=NA,
-                             tag=NA,
-                             tag_short=NA,
-                             type=NA,
-                             value=NA,
-                             stringsAsFactors=FALSE)
-  #Get Tag
-  webpage_tags[,"tag"] <-  gsub(".*?<(.*?)>.*", "\\1", webpage_tags[,"raw"]) 
-  
-  #Clean Tag
-  for(i in 1:ncol(webpage_tags))
-  {
-    webpage_tags[,i] <- iconv(webpage_tags[,i], "latin1", "ASCII", sub=" ")
-  }
-  rm(i)
-  
-  for(i in which(sapply(webpage_tags,class)=="character"))
-  {
-    webpage_tags[[i]] = trim(webpage_tags[[i]])
-  }
-  rm(i)
-  
-  for (i in 1:ncol(webpage_tags))
-  {
-    webpage_tags[,i] <- unknownToNA(webpage_tags[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-    webpage_tags[,i] <- ifelse(is.na(webpage_tags[,i]),NA, webpage_tags[,i])
-  } 
-  rm(i)
-  
-  
-  #Determine is open/close tag
-  webpage_tags[,"type"] <-  ifelse(grepl("/", webpage_tags[,"tag"]), "close", "open")
-  
-  #Get value
-  webpage_tags[,"value"] <- sapply(strsplit(webpage_tags[,"raw"], paste("<",webpage_tags[,"tag"],">",sep="")), "[", 2)
-  
-  
-  #Find all possible tags
-  raw_tags1 <- data.frame(raw=unique(webpage_tags[,"tag"]),
-                          cleaned=unique(webpage_tags[,"tag"]),
-                          stringsAsFactors=FALSE)
-  
-  #Replace hyphens
-  raw_tags1[,"cleaned"] <- gsub("-","_",raw_tags1[,"cleaned"])
-  
-  raw_tags1_trim <- raw_tags1[!(raw_tags1[,"raw"]==raw_tags1[,"cleaned"]),]
-  row.names(raw_tags1_trim) <- seq(nrow(raw_tags1_trim))
-  rm(raw_tags1)
-  
-  for (i in 1:nrow(raw_tags1_trim))
-  {
-    #i <- 1
-    #webpage_tags[,"tag"] <- gsub(raw_tags1_trim[i,"raw"],raw_tags1_trim[i,"cleaned"],webpage_tags[,"tag"])
-    #webpage_tags[,"tag_short"] <- gsub(raw_tags1_trim[i,"raw"],raw_tags1_trim[i,"cleaned"],webpage_tags[,"tag_short"])
-    
-    webpage_tags[,"tag"] <- ifelse(webpage_tags[,"tag"]==raw_tags1_trim[i,"raw"], raw_tags1_trim[i,"cleaned"], webpage_tags[,"tag"])
-    
-  } 
-  rm(raw_tags1_trim,i)
-  
-  #Remove closing tag from tag_short column
-  webpage_tags[,"tag_short"] <- gsub("/", "", webpage_tags[,"tag"])
-  
-  #Add brackets to tags
-  webpage_tags[,"tag"] <- paste("<",webpage_tags[,"tag"],">",sep="")
-  
-  #Find all possible tags
-  raw_tags2 <- data.frame(cleaned=unique(webpage_tags[,"tag_short"]),
-                          open_count=NA,
-                          close_count=NA,
-                          stringsAsFactors=FALSE)
-  
-  for (i in 1:nrow(raw_tags2))
-  {
-    #i <- 1
-    
-    webpage_tags[,"tag_status_open"] <- ifelse(grepl(paste("<",raw_tags2[i,"cleaned"],">",sep=""), webpage_tags[,"tag"]), 1, 0)
-    webpage_tags[,"tag_status_close"] <- ifelse(grepl(paste("</",raw_tags2[i,"cleaned"],">",sep=""), webpage_tags[,"tag"]), 1, 0)
-    
-    raw_tags2[i,"open_count"] <- sum(webpage_tags[,"tag_status_open"])
-    raw_tags2[i,"close_count"] <- sum(webpage_tags[,"tag_status_close"])
-    
-    webpage_tags[,"tag_status_open"] <- NA
-    webpage_tags[,"tag_status_close"] <- NA
-  } 
-  rm(i)
-  
-  #Find tags that are not closed
-  raw_tags2_bad <- raw_tags2[which(raw_tags2[,"open_count"]-raw_tags2[,"close_count"] != 0),]
-  row.names(raw_tags2_bad) <- seq(nrow(raw_tags2_bad))
-  rm(raw_tags2)
-  
-  #Find rows that need to be fixed
-  colnames(webpage_tags)[match("tag_status_open",names(webpage_tags))] <- "Final_tag"
-  colnames(webpage_tags)[match("tag_status_close",names(webpage_tags))] <- "Good"
-  
-  #Find tags that need to be closed
-  webpage_tags[,"Good"] <- ifelse(webpage_tags[,"tag_short"] %in% raw_tags2_bad[,"cleaned"], 0, 1)
-  rm(raw_tags2_bad)
-  
-  #Entity Replacement
-  for (i in 1:nrow(entity_encoding))
-  {
-    webpage_tags[,"value"] <- gsub(entity_encoding[i,"ASCII.Looks.Like"], entity_encoding[i,"Entity.Encoding"], webpage_tags[,"value"])
-    
-  } 
-  rm(entity_encoding,i)
-  
-  #Clean
-  for(i in which(sapply(webpage_tags,class)=="character"))
-  {
-    webpage_tags[[i]] = trim(webpage_tags[[i]])
-  }
-  rm(i)
-  
-  for (i in 1:ncol(webpage_tags))
-  {
-    webpage_tags[,i] <- unknownToNA(webpage_tags[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-    webpage_tags[,i] <- ifelse(is.na(webpage_tags[,i]),NA, webpage_tags[,i])
-  } 
-  rm(i)
-  
-  #Create raw encoded tags
-  webpage_tags[,"raw_encoded"] <- ifelse(is.na(webpage_tags[,"value"]),
-                                         webpage_tags[,"tag"], 
-                                         paste(webpage_tags[,"tag"],webpage_tags[,"value"],sep=""))
-  
-  #Creat final tags
-  webpage_tags[,"Final_tag"] <- ifelse(webpage_tags[,"Good"]==1, 
-                                       webpage_tags[,"raw_encoded"], 
-                                       paste(webpage_tags[,"raw_encoded"],"</",webpage_tags[,"tag_short"],">",sep=""))
-  
-  return(webpage_tags)
-  
-}
-
-find_individual_tags <- function(data,tag_raw_col,tag_short_col,tag_open_col,tag_close_col){
-  
-  #data <- webpage_sep
-  #tag_raw_col <- "Final_tag" 
-  #tag_short_col <- "tag_short"
-  #tag_open_col <- "tag_status_open"
-  #tag_close_col <- "tag_status_close"
-  
-  sep_tags1 <- data.frame(cleaned=unique(data[,tag_short_col]),
-                          open_count=NA,
-                          close_count=NA,
-                          stringsAsFactors=FALSE)
-  
-  for (i in 1:nrow(sep_tags1))
-  {
-    #i <- 1
-    #i <- 2
-    
-    data[,tag_open_col] <- ifelse(grepl(paste("<",sep_tags1[i,"cleaned"],">",sep=""), data[,tag_raw_col]), 1, 0)
-    data[,tag_close_col] <- ifelse(grepl(paste("</",sep_tags1[i,"cleaned"],">",sep=""), data[,tag_raw_col]), 1, 0)
-    
-    sep_tags1[i,"open_count"] <- sum(data[,tag_open_col])
-    sep_tags1[i,"close_count"] <- sum(data[,tag_close_col])
-    
-    data[,tag_open_col] <- NA
-    data[,tag_close_col] <- NA
-  } 
-  rm(i)
-  
-  return(sep_tags1)
-  
-}
-
-create_tag_index <- function(tag,data,tag_raw_col){
-  
-  #tag <- sep_tags2[1]
-  #data <- webpage_sep
-  #tag_raw_col <- "Final_tag"
-  
-  temp_tag <- data.frame(temp_col=data[,tag_raw_col], 
-                         temp_open_flag=NA,
-                         temp_open_index=NA,
-                         temp_close_flag=NA,
-                         temp_close_index=NA,
-                         temp_diff_flag=NA,
-                         temp_comb_flag=NA,
-                         temp_comb_index=NA, 
-                         stringsAsFactors=FALSE)
-  
-  temp_tag[,"temp_open_flag"] <- ifelse(grepl(paste("<",tag,">",sep=""), temp_tag[,"temp_col"]), 1, 0)
-  temp_tag[,"temp_open_index"] <- apply(data.frame(temp_tag[,"temp_open_flag"]), 2, cumsum)
-  
-  temp_tag[,"temp_close_flag"] <- ifelse(grepl(paste("</",tag,">",sep=""), temp_tag[,"temp_col"]), 1, 0)
-  temp_tag[,"temp_close_index"] <- apply(data.frame(temp_tag[,"temp_close_flag"]), 2, cumsum)
-  
-  temp_tag[,"temp_diff_flag"] <- (temp_tag[,"temp_open_index"]-temp_tag[,"temp_close_index"])
-  
-  temp_tag[,"temp_comb_flag"] <- (temp_tag[,"temp_close_flag"]+temp_tag[,"temp_diff_flag"])
-  temp_tag[,"temp_comb_index"] <- ifelse(temp_tag[,"temp_comb_flag"]==1, temp_tag[,"temp_open_index"], 0)
-  
-  colnames(temp_tag) <- c(tag_raw_col, 
-                          paste(tag,"OPEN_FLAG",sep="_"), paste(tag,"OPEN_INDEX",sep="_"),
-                          paste(tag,"CLOSE_FLAG",sep="_"), paste(tag,"CLOSE_INDEX",sep="_"),
-                          paste(tag,"DIFF_FLAG",sep="_"),
-                          paste(tag,"COMB_FLAG",sep="_"), paste(tag,"COMB_INDEX",sep="_"))
-  
-  output <- temp_tag[,c(paste(tag,"COMB_INDEX",sep="_"))]
-  
-  return(output)
-  
-}
-
-# extract_filing_section_by_drop <- function(x,xml_col,index_col,sub_index_col){
-#   
-#   # filer_index_val <- "FILER"
-#   # filer_company_data_sub_index_val <- "COMPANY_DATA"
-#   
-#   # xml_col <- "Final_tag"
-#   # index_col <- paste(filer_index_val,"INDEX",sep="_")
-#   # sub_index_col <- paste(filer_company_data_sub_index_val,"INDEX",sep="_")
-#   # x <- filer_data_temp[filer_data_temp[,index_col]==1,]
-#   
-#   require(XML)
-#   
-#   xml_col_num <- which(colnames(x)==xml_col)
-#   index_col_num <- which(colnames(x)==index_col)
-#   sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
-#   sub_index_col_num_max <- max(sub_index_col_num)
-#   
-#   x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
-#   
-#   keep_rows <- lapply(sub_index_col, function(y,data){
-#     
-#     #y <- "FILER_INDEX"
-#     #y <- "SERIES_AND_CLASSES_CONTRACTS_DATA_INDEX"
-#     #data <- x_trim
-#     
-#     if(y %in% colnames(data)) {
-#       
-#       return(which(data[,y]!=0))
-#       
-#     } else {
-#       
-#       return(NA)
-#       
-#     }
-#     
-#   },data=x_trim)
-#   keep_rows <- sort(unique(unlist(keep_rows)))
-#   drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
-#   
-#   x_trim2 <- x_trim[c(1,drop_rows,nrow(x_trim)),]
-#   
-#   temp_df <- xmlToDataFrame(x_trim2[,xml_col])
-#   
-#   return(temp_df)
-# }
-# 
-# extract_filing_section_by_keep <- function(x,xml_col,index_col,sub_index_col){
-#   
-#   # xml_col <- "Final_tag"
-#   # index_col <- filer_index_val2
-#   # sub_index_col <- filer_former_company_sub_index_val2
-#   # x <- filer_data_temp[filer_data_temp[,index_col]==1,]
-#   
-#   
-#   require(XML)
-#   
-#   xml_col_num <- which(colnames(x)==xml_col)
-#   index_col_num <- which(colnames(x)==index_col)
-#   sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
-#   sub_index_col_num_max <- max(sub_index_col_num)
-#   
-#   x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
-#   
-#   keep_rows <- lapply(sub_index_col, function(y,data){
-#     
-#     #y <- "FILER_INDEX"
-#     #y <- "SERIES_AND_CLASSES_CONTRACTS_DATA_INDEX"
-#     #data <- x_trim
-#     
-#     if(y %in% colnames(data)) {
-#       
-#       return(which(data[,y]!=0))
-#       
-#     } else {
-#       
-#       return(NA)
-#       
-#     }
-#     
-#   },data=x_trim)
-#   keep_rows <- sort(unique(unlist(keep_rows)))
-#   drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
-#   
-#   x_trim2 <- x_trim[c(1,keep_rows,nrow(x_trim)),]
-#   
-#   temp_df <- xmlToDataFrame(x_trim2[,xml_col])
-#   
-#   return(temp_df)
-# }
-
-
-extract_filing_section_by_drop <- function(x,xml_col,tag_col,index_col,sub_index_col,index_flag,file){
-  
-  #xml_col="Final_tag"
-  #tag_col="tag_short"
-  
-  #index_col=filer_index_val
-  #sub_index_col=filer_former_company_sub_index_val
-  #index_flag <- filer_index_flag
-  #file=file
-  #x <- filer_data_temp[filer_data_temp[,filer_index_val2]==1,]
-  #x <- filer_data_temp[filer_data_temp[,filer_index_val2]==2,]
-  #x <- filer_data_temp[filer_data_temp[,filer_index_val2]==3,]
-  #x <- filer_data_temp[filer_data_temp[,filer_index_val2]==4,]
-  
-  #index_col=header_index_val
-  #sub_index_col=header_info_sub_index_val
-  #index_flag=header_index_flag
-  
-  #x <- header_data_temp[header_data_temp[,header_index_val2]==1,]
-  
-  require(XML)
-  
-  extract_filing_section_by_drop_sub <- function(x,xml_col,index_col_sub,sub_index_col_sub){
-    
-    # xml_col <- xml_col
-    # index_col_sub <- index_col2
-    # sub_index_col_sub <- sub_index_col2
-    # x <- x
-    
-    xml_col_num <- which(colnames(x)==xml_col)
-    index_col_num <- which(colnames(x)==index_col_sub)
-    sub_index_col_num <-  unlist(lapply(sub_index_col_sub, function(y,cols){ which(cols==y) },cols=colnames(x)))
-    sub_index_col_num_max <- max(sub_index_col_num)
-    
-    x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
-    
-    keep_rows <- lapply(sub_index_col_sub, function(y,data){
-      
-      #y <- "FILER_INDEX"
-      #y <- "SERIES_AND_CLASSES_CONTRACTS_DATA_INDEX"
-      #data <- x_trim
-      
-      if(y %in% colnames(data)) {
-        
-        return(which(data[,y]!=0))
-        
-      } else {
-        
-        return(NA)
-        
-      }
-      
-    },data=x_trim)
-    keep_rows <- sort(unique(unlist(keep_rows)))
-    drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
-    
-    x_trim2 <- x_trim[c(1,drop_rows,nrow(x_trim)),]
-    
-    temp_df <- xmlToDataFrame(x_trim2[,xml_col])
-    
-    return(temp_df)
-  }
-  index_col2 <- paste(index_col,"INDEX",sep="_")
-  sub_index_col2 <- paste(sub_index_col,"INDEX",sep="_")
-  
-  index_val2 <- unique(x[,index_col2])
-  
-  flag <- (sub_index_col %in% x[,tag_col])
-  
-  #cat("\n","flag","\n")
-  
-  if(any(flag)) {
-    
-    #cat("\n","IF","\n")
-    
-    merge0 <- data.frame(file=file,index_col=index_val2,stringsAsFactors=FALSE)
-    
-    #cat("\n","merge0","\n")
-    
-    colnames(merge0) <- c("file",index_col2)
-    
-    #cat("\n","merge0 colnames","\n")
-    
-    merge1 <- extract_filing_section_by_drop_sub(x,xml_col,index_col2,sub_index_col2)
-    
-    #cat("\n","merge1","\n")
-    
-    merge <- data.frame(merge0,merge1,stringsAsFactors=FALSE)
-    
-    #cat("\n","merge","\n")
-    
-    
-    rm(merge0,merge1)
-    
-  } else {
-    
-    #cat("\n","ELSE","\n")
-    
-    merge <- data.frame(file=file,index_col=index_val2,stringsAsFactors=FALSE)
-    
-    #cat("\n","merge","\n")
-    
-    colnames(merge) <- c("file",index_col2)
-    
-    #cat("\n","merge colnames","\n")
-  }
-  
-  rm(index_col2,sub_index_col2,index_val2,flag)
-  
-  return(merge)
-  
-}
-
-extract_filing_section_by_keep <- function(x,xml_col,tag_col,index_col,sub_index_col,index_flag,file){
-  
-  #xml_col="Final_tag"
-  #tag_col="tag_short"
-  #index_col=filer_index_val
-  #sub_index_col=filer_former_company_sub_index_val
-  #index_flag <- filer_index_flag
-  #file=file
-  #x <- filer_data_temp[filer_data_temp[,filer_index_val2]==1,]
-  #x <- filer_data_temp[filer_data_temp[,filer_index_val2]==2,]
-  #x <- filer_data_temp[filer_data_temp[,filer_index_val2]==3,]
-  #x <- filer_data_temp[filer_data_temp[,filer_index_val2]==4,]
-  
-  require(XML)
-  
-  extract_filing_section_by_keep_sub <- function(x,xml_col,index_col,sub_index_col){
-    
-    # xml_col <- "Final_tag"
-    # index_col <- filer_index_val2
-    # sub_index_col <- filer_former_company_sub_index_val2
-    # x <- filer_data_temp[filer_data_temp[,index_col]==1,]
-    
-    xml_col_num <- which(colnames(x)==xml_col)
-    index_col_num <- which(colnames(x)==index_col)
-    sub_index_col_num <-  unlist(lapply(sub_index_col, function(y,cols){ which(cols==y) },cols=colnames(x)))
-    sub_index_col_num_max <- max(sub_index_col_num)
-    
-    x_trim <- x[,c(xml_col_num,seq(index_col_num,sub_index_col_num_max))]
-    
-    keep_rows <- lapply(sub_index_col, function(y,data){
-      
-      #y <- "FILER_INDEX"
-      #y <- "SERIES_AND_CLASSES_CONTRACTS_DATA_INDEX"
-      #data <- x_trim
-      
-      if(y %in% colnames(data)) {
-        
-        return(which(data[,y]!=0))
-        
-      } else {
-        
-        return(NA)
-        
-      }
-      
-    },data=x_trim)
-    keep_rows <- sort(unique(unlist(keep_rows)))
-    drop_rows <- which(!(seq(1,nrow(x_trim)) %in% keep_rows))
-    
-    x_trim2 <- x_trim[c(1,keep_rows,nrow(x_trim)),]
-    
-    temp_df <- xmlToDataFrame(x_trim2[,xml_col])
-    
-    return(temp_df)
-  }
-  
-  index_col2 <- paste(index_col,"INDEX",sep="_")
-  sub_index_col2 <- paste(sub_index_col,"INDEX",sep="_")
-  
-  index_val2 <- unique(x[,index_col2])
-  
-  flag <- (sub_index_col %in% x[,tag_col])
-  
-  if(any(flag)) {
-    
-    merge0 <- data.frame(file=file,index_col=index_val2,stringsAsFactors=FALSE)
-    colnames(merge0) <- c("file",index_col2)
-    
-    merge1 <- extract_filing_section_by_keep_sub(x,xml_col,index_col2,sub_index_col2)
-    merge <- data.frame(merge0,merge1,stringsAsFactors=FALSE)
-    
-    rm(merge0,merge1)
-    
-  } else {
-    
-    merge <- data.frame(file=file,index_col=index_val2,stringsAsFactors=FALSE)
-    colnames(merge) <- c("file",index_col2)
-    
-  }
-  
-  rm(index_col2,sub_index_col2,index_val2,flag)
-  
-  return(merge)
-  
-}
-
-create_sub_index_sequence <- function(data,index_val,sub_index_val,nonindex_prefix){
-  
-  #data <- header_intro_merge2
-  #index_val <- header_index_val2
-  #sub_index_val <- header_info_sub_index_val2
-  #nonindex_prefix <- ""
-  
-  #data <- filer_company_data_merge2
-  #index_val <- paste(filer_index_val,"INDEX",sep="_")
-  #sub_index_val <- paste(filer_company_data_sub_index_val,"INDEX",sep="_")
-  #nonindex_prefix <- ""
-  
-  #data <- filer_filing_values_merge2
-  #index_val <- paste(filer_index_val,"INDEX",sep="_")
-  #sub_index_val <- paste(filer_filing_values_sub_index_val,"INDEX",sep="_")
-  #nonindex_prefix <- ""
-  
-  #data <- filer_former_company_merge2
-  #index_val <- paste(filer_index_val,"INDEX",sep="_")
-  #sub_index_val <- paste(filer_former_company_sub_index_val,"INDEX",sep="_")
-  #nonindex_prefix <- ""
-  
-  #data <- filer_business_address_merge2
-  #index_val <- paste(filer_index_val,"INDEX",sep="_")
-  #sub_index_val <- paste(filer_business_address_sub_index_val,"INDEX",sep="_")
-  #nonindex_prefix <- "_BUSINESS"
-  
-  #data <- filer_mail_address_merge2
-  #index_val <- paste(filer_index_val,"INDEX",sep="_")
-  #sub_index_val <- paste(filer_mail_address_sub_index_val,"INDEX",sep="_")
-  #nonindex_prefix <- "_MAIL"
-  
-  #data <- series_class_contract_merge2
-  #index_val <- paste(series_index_val,"INDEX",sep="_")
-  #sub_index_val <- paste(series_class_contract_sub_index_val,"INDEX",sep="_")
-  #nonindex_prefix <- ""
-  
-  require(plyr)
-  
-  sub_index_val_top <- head(sub_index_val,1)
-  
-  data2 <- ddply(.data=data,.variables=index_val,.fun=function(x,sub_index_val_top){
-    
-    #x <- data[1,]
-    #sub_index_val_top <- sub_index_val_top
-    
-    data2_temp <- data.frame(tempseq=NA,x,stringsAsFactors=FALSE)
-    
-    
-    #       if (ncol(data2_temp)==4) {
-    # 
-    #         #data2_temp <- data2_temp[!is.na(data2_temp[,4]),]
-    #         if(!is.na(data2_temp[,4])){
-    #           
-    #           data2_temp[,"tempseq"] <- seq(1,nrow(data2_temp),1)
-    #         }
-    #         
-    #       } else if (ncol(data2_temp)>=5) {
-    #         
-    #         #data2_temp <- data2_temp[rowSums(is.na(data2_temp[,4:ncol(data2_temp)]))<(ncol(data2_temp)-3),]
-    #         if(rowSums(is.na(data2_temp[,4:ncol(data2_temp)]))==(ncol(data2_temp)-3)){
-    #           
-    #           data2_temp[,"tempseq"] <- seq(1,nrow(data2_temp),1)
-    #         }
-    #         
-    #       } else {
-    #         
-    #       }
-    
-    data2_temp[,"tempseq"] <- seq(1,nrow(data2_temp),1)
-    
-    colnames(data2_temp)[1] <- sub_index_val_top
-    
-    return(data2_temp)
-    
-  },sub_index_val_top=sub_index_val_top)
-  data2[sapply(data2, is.factor)] <- lapply(data2[sapply(data2, is.factor)], as.character)
-  
-  if (ncol(data2)==3) {
-    
-    data2[,1] <- NA
-    
-  }
-  
-  data2_cols <- colnames(data2)
-  filer_company_data_index_cols <- c("file",index_val,sub_index_val_top)
-  filer_company_data_non_index_cols <- data2_cols[!(data2_cols %in% filer_company_data_index_cols)]
-  data3 <- data2[,c(filer_company_data_index_cols,filer_company_data_non_index_cols)]
-  
-  data4 <- data3
-  
-  if(length(filer_company_data_non_index_cols)==0) {
-    
-    data4_new_colnames <- c(filer_company_data_index_cols)
-    data4_new_colnames <- data4_new_colnames[!(data4_new_colnames=="")]
-    
-  } else {
-    
-    data4_new_colnames <- c(filer_company_data_index_cols,paste(filer_company_data_non_index_cols,nonindex_prefix,sep=""))
-    data4_new_colnames <- data4_new_colnames[!(data4_new_colnames=="")]
-    
-  }
-  
-  colnames(data4) <- data4_new_colnames
-  
-  data4 <- data4[order(data4[,"file"],data4[,index_val],data4[,sub_index_val_top]),]
-  row.names(data4) <- seq(nrow(data4))
-  
-  rm(data2,data3, filer_company_data_index_cols,filer_company_data_non_index_cols,data4_new_colnames)
-  
-  return(data4)
-}
-
-create_comb_df <- function(list,list_pos,list_file_col,filing_info,filing_info_file_col){
-  
-  #list <- trim_headings
-  #list_pos <- 1
-  #list_file_col <- "file"
-  #filing_info <- filings_trim2_short
-  #filing_info_file_col <- "file_header"
-  
-  require(plyr)
-  
-  temp_comb <- sapply(list, "[", list_pos)
-  temp_comb2 <- do.call(rbind.fill,temp_comb)
-  temp_comb3 <- merge(filing_info,temp_comb2, by.x=filing_info_file_col,by.y=list_file_col,
-                      all.x=TRUE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"),incomparables = NA)
-  temp_comb3 <- temp_comb3[order(temp_comb3[,filing_info_file_col]),]
-  row.names(temp_comb3) <- seq(nrow(temp_comb3))
-  temp_comb3 <- temp_comb3[,c(colnames(filing_info),
-                              colnames(temp_comb3[,!(colnames(temp_comb3) %in% colnames(filing_info))]))]
-  
-  temp_comb4 <- temp_comb3
-  temp_comb4[sapply(temp_comb4, is.factor)] <- lapply(temp_comb4[sapply(temp_comb4, is.factor)], as.character)
-  
-  return(temp_comb4)
-  
-}
-
-create_comb_df_overall <- function(list,list_pos,filing_info_file_col){
-  
-  #list <- filings_header_info
-  #list_pos <- 1
-  #filing_info_file_col <- "file_header"
-  
-  require(gdata)
-  require(plyr)
-  
-  temp_comb <- sapply(list, "[", list_pos)
-  temp_comb2 <- do.call(rbind.fill,temp_comb)
-  #temp_comb3 <- merge(filing_info,temp_comb2, by.x=filing_info_file_col,by.y=list_file_col,
-  #                    all.x=TRUE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"),incomparables = NA)
-  temp_comb3 <- temp_comb2
-  temp_comb3 <- temp_comb3[order(temp_comb3[,"yr"],temp_comb3[,filing_info_file_col]),]
-  row.names(temp_comb3) <- seq(nrow(temp_comb3))
-  
-  temp_comb4 <- temp_comb3
-  temp_comb4[sapply(temp_comb4, is.factor)] <- lapply(temp_comb4[sapply(temp_comb4, is.factor)], as.character)
-  
-  temp_comb5 <- temp_comb4
-  for(i in which(sapply(temp_comb5,class)=="character"))
-  {
-    temp_comb5[[i]] = trim(temp_comb5[[i]])
-  }
-  rm(i)
-  temp_comb6 <- temp_comb5
-  for (i in 1:ncol(temp_comb6))
-  {
-    temp_comb6[,i] <- unknownToNA(temp_comb6[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                                  NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                                  NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-    temp_comb6[,i] <- ifelse(is.na(temp_comb6[,i]),NA, temp_comb6[,i])
-  } 
-  rm(i)
-  
-  return(temp_comb6)
-  
-}
 
 
 ###############################################################################
@@ -812,9 +92,7 @@ cat("SECTION: LIBRARIES", "\n")
 external_packages <- c("gdata","plyr","XML")
 invisible(unlist(sapply(external_packages,load_external_packages, repo_str=repo, simplify=FALSE, USE.NAMES=FALSE)))
 installed_packages <- list_installed_packages(external_packages)
-
 rm(installed_packages)
-
 
 ###############################################################################
 #PARAMETERS;
@@ -843,8 +121,8 @@ endqtr <- 4
 #downloadfolder <- "MF_All"
 #downloadfolder <- "MF_SemiAnnual_Reports"
 #downloadfolder <- "MF_Annual_Reports"
-#downloadfolder <- "MF_Shareholder_Reports_N-CSR-A"
-downloadfolder <- "MF_Shareholder_Reports_N-CSR"
+downloadfolder <- "MF_Shareholder_Reports_N-CSR-A"
+#downloadfolder <- "MF_Shareholder_Reports_N-CSR"
 #downloadfolder <- "MF_Shareholder_Reports_N-CSRS-A"
 #downloadfolder <- "MF_Shareholder_Reports_N-CSRS"
 
@@ -1003,456 +281,384 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                downloaded_files2 <- downloaded_files2[order(downloaded_files2[,"filepath"]),]
                                row.names(downloaded_files2) <- seq(nrow(downloaded_files2))
                                
-                               downloaded_files3 <- data.frame(yr_id=NA,
-                                                               downloaded_files2,
-                                                               stringsAsFactors=FALSE)
+                               downloaded_files3 <- data.frame(yr_id=NA,downloaded_files2,stringsAsFactors=FALSE)
                                downloaded_files3[,"yr_id"] <- seq(1,nrow(downloaded_files3),1)
                                
                                rm(downloaded_files2)
                                
-                               #Header Section
-                               trim_headings_header <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                                             .fun = function(y,entity_encoding){
-                                                               
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000842939-03-000055.hdr.sgml"),]
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001108086-05-000062.hdr.sgml"),]
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000078713-13-000036.hdr.sgml"),]
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-13-456867.hdr.sgml"),]
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001571049-13-000837.hdr.sgml"),]
-                                                               #y <- downloaded_files3[1,]
-                                                               
-                                                               #entity_encoding <- entity_encoding
-                                                               
-                                                               file <- unique(y[,"file"])
-                                                               filepath <- unique(y[,"filepath"])
-                                                               
-                                                               cat("\n",file,"\n")
-                                                               
-                                                               webpage_df_xml_only_df <- import_local_edgar_file(filepath)
-                                                               webpage_df_xml_only_df[,"raw"] <- gsub("&NBSP;"," ",webpage_df_xml_only_df[,"raw"])
-                                                               
-                                                               webpage_tags <- fix_edgar_tags(webpage_df_xml_only_df[,"raw"],entity_encoding)
-                                                               
-                                                               rm(webpage_df_xml_only_df)
-                                                               
-                                                               webpage_sep <- webpage_tags
-                                                               webpage_sep[1,"Final_tag"] <- "<SEC_HEADER>"
-                                                               
-                                                               rm(webpage_tags)
-                                                               
-                                                               webpage_sep <- data.frame(webpage_sep,tag_status_open=NA,tag_status_close=NA,stringsAsFactors=FALSE)
-                                                               
-                                                               #Find all possible tags
-                                                               sep_tags1 <- find_individual_tags(data=webpage_sep,tag_raw_col="Final_tag",tag_short_col="tag_short",
-                                                                                                 tag_open_col="tag_status_open",tag_close_col="tag_status_close")
-                                                               sep_tags2 <- sep_tags1[,"cleaned"]
-                                                               
-                                                               index_temp <- llply(.data=sep_tags2, create_tag_index,data=webpage_sep, tag_raw_col="Final_tag",
-                                                                                   .progress = "none", .inform = FALSE,.parallel = FALSE, .paropts = NULL)
-                                                               index <- do.call(cbind, index_temp)
-                                                               index <- as.data.frame(index,stringsAsFactors=FALSE)
-                                                               colnames(index) <- paste(sep_tags2,"INDEX",sep="_")
-                                                               rm(index_temp)
-                                                               
-                                                               webpage_sep_index <- data.frame(file=file, Final_tag=webpage_sep[,"Final_tag"],tag_short=webpage_sep[,"tag_short"],index,stringsAsFactors=FALSE)
-                                                               rm(index)
-                                                               
-                                                               #Header Section - Setup
-                                                               header_index_val <- "SEC_HEADER"
-                                                               header_index_val2 <- paste(header_index_val,"INDEX",sep="_")
-                                                               header_index_flag <- (header_index_val %in% sep_tags2)
-                                                               
-                                                               #Header Section - Intro
-                                                               header_info_sub_index_val <- c("FILER","SERIES_AND_CLASSES_CONTRACTS_DATA")
-                                                               header_info_sub_index_val2 <- paste(header_info_sub_index_val,"INDEX",sep="_")
-                                                               
-                                                               if(header_index_flag) {
-                                                                 
-                                                                 header_data_temp <- webpage_sep_index[!(webpage_sep_index[,header_index_val2] %in% c(0)),]
-                                                                 row.names(header_data_temp) <- seq(nrow(header_data_temp))
-                                                                 
-                                                                 #cat("\n","header_data_temp","\n")
-                                                                 
-                                                                 header_intro_merge1 <- dlply(.data=header_data_temp, .variables=c("file",header_index_val2), extract_filing_section_by_drop,
-                                                                                              xml_col="Final_tag",tag_col="tag_short",index_col=header_index_val,
-                                                                                              sub_index_col=header_info_sub_index_val, index_flag=header_index_flag,file=file)
-                                                                 #cat("\n","header_intro_merge1","\n")
-                                                                 
-                                                                 header_intro_merge2 <- do.call(rbind.fill,header_intro_merge1)
-                                                                 
-                                                                 #cat("\n","header_intro_merge2","\n")
-                                                                 
-                                                                 header_intro_merge <-  create_sub_index_sequence(data=header_intro_merge2,index_val=header_index_val2,
-                                                                                                                  sub_index_val=header_info_sub_index_val2,nonindex_prefix="")
-                                                                 
-                                                                 #cat("\n","header_intro_merge","\n")
-                                                                 
-                                                                 rm(header_data_temp,header_intro_merge1,header_intro_merge2)
-                                                                 
-                                                                 #header_intro_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                 #colnames(header_intro_merge) <- c("file",header_index_val2,head(header_info_sub_index_val2,1))
-                                                                 
-                                                                 
-                                                               } else {
-                                                                 
-                                                                 header_intro_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                 colnames(header_intro_merge) <- c("file",header_index_val2,head(header_info_sub_index_val2,1))
-                                                                 
-                                                               }
-                                                               rm(header_info_sub_index_val,header_info_sub_index_val2)
-                                                               
-                                                               df_comb_list <- list(header_intro_merge)
-                                                               
-                                                               rm(header_intro_merge)
-                                                               rm(file,filepath)
-                                                               rm(sep_tags1,sep_tags2,webpage_sep,webpage_sep_index)
-                                                               
-                                                               return(df_comb_list)
-                                                               
-                                                             },entity_encoding=entity_encoding,
-                                                             .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
-                               
-                               header_intro_comb <- create_comb_df(list=trim_headings_header,list_pos=1,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               rm(trim_headings_header)
-                               
-                               #File Section
-                               trim_headings_filer <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                                            .fun = function(y,entity_encoding){
-                                                              
-                                                              #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000842939-03-000055.hdr.sgml"),]
-                                                              #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000078713-13-000036.hdr.sgml"),]
-                                                              #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-13-456867.hdr.sgml"),]
-                                                              #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001571049-13-000837.hdr.sgml"),]
-                                                              #y <- downloaded_files3[1,]
-                                                              
-                                                              #entity_encoding <- entity_encoding
-                                                              
-                                                              file <- unique(y[,"file"])
-                                                              filepath <- unique(y[,"filepath"])
-                                                              
-                                                              cat("\n",file,"\n")
-                                                              
-                                                              webpage_df_xml_only_df <- import_local_edgar_file(filepath)
-                                                              webpage_df_xml_only_df[,"raw"] <- gsub("&NBSP;"," ",webpage_df_xml_only_df[,"raw"])
-                                                              
-                                                              webpage_tags <- fix_edgar_tags(webpage_df_xml_only_df[,"raw"],entity_encoding)
-                                                              
-                                                              rm(webpage_df_xml_only_df)
-                                                              
-                                                              webpage_sep <- webpage_tags
-                                                              webpage_sep[1,"Final_tag"] <- "<SEC_HEADER>"
-                                                              
-                                                              rm(webpage_tags)
-                                                              
-                                                              webpage_sep <- data.frame(webpage_sep,tag_status_open=NA,tag_status_close=NA,stringsAsFactors=FALSE)
-                                                              
-                                                              #Find all possible tags
-                                                              sep_tags1 <- find_individual_tags(data=webpage_sep,tag_raw_col="Final_tag",tag_short_col="tag_short",
-                                                                                                tag_open_col="tag_status_open",tag_close_col="tag_status_close")
-                                                              sep_tags2 <- sep_tags1[,"cleaned"]
-                                                              
-                                                              index_temp <- llply(.data=sep_tags2, create_tag_index,data=webpage_sep, tag_raw_col="Final_tag",
-                                                                                  .progress = "none", .inform = FALSE,.parallel = FALSE, .paropts = NULL)
-                                                              index <- do.call(cbind, index_temp)
-                                                              index <- as.data.frame(index,stringsAsFactors=FALSE)
-                                                              colnames(index) <- paste(sep_tags2,"INDEX",sep="_")
-                                                              rm(index_temp)
-                                                              
-                                                              webpage_sep_index <- data.frame(file=file, Final_tag=webpage_sep[,"Final_tag"],tag_short=webpage_sep[,"tag_short"],index,stringsAsFactors=FALSE)
-                                                              rm(index)
-                                                              
-                                                              #Filer Section - Setup
-                                                              filer_index_val <- "FILER"
-                                                              filer_index_val2 <- paste(filer_index_val,"INDEX",sep="_")
-                                                              filer_index_flag <- (filer_index_val %in% sep_tags2)
-                                                              
-                                                              #Filer Section - Company Data
-                                                              filer_company_data_sub_index_val <- "COMPANY_DATA"
-                                                              filer_company_data_sub_index_val2 <- paste(filer_company_data_sub_index_val,"INDEX",sep="_")
-                                                              
-                                                              if(filer_index_flag) {
-                                                                
-                                                                filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
-                                                                row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
-                                                                
-                                                                filer_company_data_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
-                                                                                                   xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
-                                                                                                   sub_index_col=filer_company_data_sub_index_val, index_flag=filer_index_flag,file=file)
-                                                                filer_company_data_merge2 <- do.call(rbind.fill,filer_company_data_merge1)
-                                                                
-                                                                filer_company_data_merge <-  create_sub_index_sequence(data=filer_company_data_merge2,index_val=filer_index_val2,
-                                                                                                                       sub_index_val=filer_company_data_sub_index_val2,nonindex_prefix="")
-                                                                
-                                                                rm(filer_data_temp,filer_company_data_merge1,filer_company_data_merge2)
-                                                                
-                                                              } else {
-                                                                
-                                                                filer_company_data_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                colnames(filer_company_data_merge) <- c("file",filer_index_val2,head(filer_company_data_sub_index_val2,1))
-                                                                
-                                                              }
-                                                              rm(filer_company_data_sub_index_val,filer_company_data_sub_index_val2)
-                                                              
-                                                              
-                                                              #Filer Section - Filing Values
-                                                              filer_filing_values_sub_index_val <- "FILING_VALUES"
-                                                              filer_filing_values_sub_index_val2 <- paste(filer_filing_values_sub_index_val,"INDEX",sep="_")
-                                                              
-                                                              if(filer_index_flag) {
-                                                                
-                                                                filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
-                                                                row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
-                                                                
-                                                                filer_filing_values_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
-                                                                                                    xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
-                                                                                                    sub_index_col=filer_filing_values_sub_index_val, index_flag=filer_index_flag,file=file)
-                                                                filer_filing_values_merge2 <- do.call(rbind.fill,filer_filing_values_merge1)
-                                                                
-                                                                filer_filing_values_merge <-  create_sub_index_sequence(data=filer_filing_values_merge2,index_val=filer_index_val2,
-                                                                                                                        sub_index_val=filer_filing_values_sub_index_val2,nonindex_prefix="")
-                                                                
-                                                                rm(filer_data_temp,filer_filing_values_merge1,filer_filing_values_merge2)
-                                                                
-                                                              } else {
-                                                                
-                                                                filer_filing_values_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                colnames(filer_filing_values_merge) <- c("file",filer_index_val2,head(filer_filing_values_sub_index_val2,1))
-                                                                
-                                                              }
-                                                              rm(filer_filing_values_sub_index_val,filer_filing_values_sub_index_val2)
-                                                              
-                                                              
-                                                              #Filer Section - Business Address
-                                                              filer_business_address_sub_index_val <- "BUSINESS_ADDRESS"
-                                                              filer_business_address_sub_index_val2 <- paste(filer_business_address_sub_index_val,"INDEX",sep="_")
-                                                              
-                                                              if(filer_index_flag) {
-                                                                
-                                                                filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
-                                                                row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
-                                                                
-                                                                filer_business_address_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
-                                                                                                       xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
-                                                                                                       sub_index_col=filer_business_address_sub_index_val, index_flag=filer_index_flag,file=file)
-                                                                filer_business_address_merge2 <- do.call(rbind.fill,filer_business_address_merge1)
-                                                                
-                                                                filer_business_address_merge <-  create_sub_index_sequence(data=filer_business_address_merge2,index_val=filer_index_val2,
-                                                                                                                           sub_index_val=filer_business_address_sub_index_val2,nonindex_prefix="_BUSINESS")
-                                                                
-                                                                rm(filer_data_temp,filer_business_address_merge1,filer_business_address_merge2)
-                                                                
-                                                              } else {
-                                                                
-                                                                filer_business_address_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                colnames(filer_business_address_merge) <- c("file",filer_index_val2,head(filer_business_address_sub_index_val2,1))
-                                                                
-                                                              }
-                                                              rm(filer_business_address_sub_index_val,filer_business_address_sub_index_val2)
-                                                              
-                                                              
-                                                              #Filer Section - Mail Address
-                                                              filer_mail_address_sub_index_val <- "MAIL_ADDRESS"
-                                                              filer_mail_address_sub_index_val2 <- paste(filer_mail_address_sub_index_val,"INDEX",sep="_")
-                                                              
-                                                              if(filer_index_flag) {
-                                                                
-                                                                filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
-                                                                row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
-                                                                
-                                                                filer_mail_address_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
-                                                                                                   xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
-                                                                                                   sub_index_col=filer_mail_address_sub_index_val, index_flag=filer_index_flag,file=file)
-                                                                filer_mail_address_merge2 <- do.call(rbind.fill,filer_mail_address_merge1)
-                                                                
-                                                                filer_mail_address_merge <-  create_sub_index_sequence(data=filer_mail_address_merge2,index_val=filer_index_val2,
-                                                                                                                       sub_index_val=filer_mail_address_sub_index_val2,nonindex_prefix="_MAIL")
-                                                                
-                                                                rm(filer_data_temp,filer_mail_address_merge1,filer_mail_address_merge2)
-                                                                
-                                                              } else {
-                                                                
-                                                                filer_mail_address_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                colnames(filer_mail_address_merge) <- c("file",filer_index_val2,head(filer_mail_address_sub_index_val2,1))
-                                                                
-                                                              }
-                                                              rm(filer_mail_address_sub_index_val,filer_mail_address_sub_index_val2)
-                                                              
-                                                              
-                                                              #Filer Section - Former Company
-                                                              filer_former_company_sub_index_val <- "FORMER_COMPANY"
-                                                              filer_former_company_sub_index_val2 <- paste(filer_former_company_sub_index_val,"INDEX",sep="_")
-                                                              
-                                                              if(filer_index_flag) {
-                                                                
-                                                                filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
-                                                                row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
-                                                                
-                                                                filer_former_company_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
-                                                                                                     xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
-                                                                                                     sub_index_col=filer_former_company_sub_index_val, index_flag=filer_index_flag,file=file)
-                                                                filer_former_company_merge2 <- do.call(rbind.fill,filer_former_company_merge1)
-                                                                
-                                                                filer_former_company_merge <-  create_sub_index_sequence(data=filer_former_company_merge2,index_val=filer_index_val2,
-                                                                                                                         sub_index_val=filer_former_company_sub_index_val2,nonindex_prefix="")
-                                                                
-                                                                rm(filer_data_temp,filer_former_company_merge1,filer_former_company_merge2)
-                                                                
-                                                              } else {
-                                                                
-                                                                filer_former_company_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                colnames(filer_former_company_merge) <- c("file",filer_index_val2,head(filer_former_company_sub_index_val2,1))
-                                                                
-                                                              }
-                                                              rm(filer_former_company_sub_index_val,filer_former_company_sub_index_val2)
-                                                              
-                                                              
-                                                              rm(filer_index_val,filer_index_val2,filer_index_flag)
-                                                              
-                                                              
-                                                              df_comb_list <- list(filer_company_data_merge,filer_filing_values_merge,filer_business_address_merge, filer_mail_address_merge,filer_former_company_merge)
-                                                              
-                                                              rm(filer_company_data_merge,filer_filing_values_merge,filer_business_address_merge, filer_mail_address_merge,filer_former_company_merge)
-                                                              rm(file,filepath)
-                                                              rm(sep_tags1,sep_tags2,webpage_sep,webpage_sep_index)
-                                                              
-                                                              return(df_comb_list)
-                                                              
-                                                            },entity_encoding=entity_encoding,
-                                                            .progress = "none",.inform = TRUE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
-                               
-                               filer_company_data_comb <- create_comb_df(list=trim_headings_filer,list_pos=1,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_filing_values_comb <- create_comb_df(list=trim_headings_filer,list_pos=2,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_business_address_comb <- create_comb_df(list=trim_headings_filer,list_pos=3,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_mail_address_comb <- create_comb_df(list=trim_headings_filer,list_pos=4,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_former_company_comb <- create_comb_df(list=trim_headings_filer,list_pos=5,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               rm(trim_headings_filer)
-                               
-                               #Series Section
-                               trim_headings_series <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                                             .fun = function(y,entity_encoding){
-                                                               
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000842939-03-000055.hdr.sgml"),]
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000078713-13-000036.hdr.sgml"),]
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-13-456867.hdr.sgml"),]
-                                                               #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001571049-13-000837.hdr.sgml"),]
-                                                               #y <- downloaded_files3[1,]
-                                                               
-                                                               #entity_encoding <- entity_encoding
-                                                               
-                                                               file <- unique(y[,"file"])
-                                                               filepath <- unique(y[,"filepath"])
-                                                               
-                                                               cat("\n",file,"\n")
-                                                               
-                                                               webpage_df_xml_only_df <- import_local_edgar_file(filepath)
-                                                               webpage_df_xml_only_df[,"raw"] <- gsub("&NBSP;"," ",webpage_df_xml_only_df[,"raw"])
-                                                               
-                                                               webpage_tags <- fix_edgar_tags(webpage_df_xml_only_df[,"raw"],entity_encoding)
-                                                               
-                                                               rm(webpage_df_xml_only_df)
-                                                               
-                                                               webpage_sep <- webpage_tags
-                                                               webpage_sep[1,"Final_tag"] <- "<SEC_HEADER>"
-                                                               
-                                                               rm(webpage_tags)
-                                                               
-                                                               webpage_sep <- data.frame(webpage_sep,tag_status_open=NA,tag_status_close=NA,stringsAsFactors=FALSE)
-                                                               
-                                                               #Find all possible tags
-                                                               sep_tags1 <- find_individual_tags(data=webpage_sep,tag_raw_col="Final_tag",tag_short_col="tag_short",
-                                                                                                 tag_open_col="tag_status_open",tag_close_col="tag_status_close")
-                                                               sep_tags2 <- sep_tags1[,"cleaned"]
-                                                               
-                                                               index_temp <- llply(.data=sep_tags2, create_tag_index,data=webpage_sep, tag_raw_col="Final_tag",
-                                                                                   .progress = "none", .inform = FALSE,.parallel = FALSE, .paropts = NULL)
-                                                               index <- do.call(cbind, index_temp)
-                                                               index <- as.data.frame(index,stringsAsFactors=FALSE)
-                                                               colnames(index) <- paste(sep_tags2,"INDEX",sep="_")
-                                                               rm(index_temp)
-                                                               
-                                                               webpage_sep_index <- data.frame(file=file, Final_tag=webpage_sep[,"Final_tag"],tag_short=webpage_sep[,"tag_short"],index,stringsAsFactors=FALSE)
-                                                               rm(index)
-                                                               
-                                                               #Series Section - Setup
-                                                               series_index_val <- "SERIES"
-                                                               series_index_val2 <- paste(series_index_val,"INDEX",sep="_")
-                                                               series_index_flag <- (series_index_val %in% sep_tags2)
-                                                               
-                                                               #Series Section - Other
-                                                               series_other_sub_index_val <- "CLASS_CONTRACT"
-                                                               series_other_sub_index_val2 <- paste(series_other_sub_index_val,"INDEX",sep="_")
-                                                               
-                                                               if(series_index_flag) {
-                                                                 
-                                                                 series_data_temp <- webpage_sep_index[!(webpage_sep_index[,series_index_val2] %in% c(0)),]
-                                                                 row.names(series_data_temp) <- seq(nrow(series_data_temp))
-                                                                 
-                                                                 series_other_merge1 <- dlply(.data=series_data_temp, .variables=c("file",series_index_val2), extract_filing_section_by_drop,
-                                                                                              xml_col="Final_tag",tag_col="tag_short",index_col=series_index_val,
-                                                                                              sub_index_col=series_other_sub_index_val, index_flag=series_index_flag,file=file)
-                                                                 series_other_merge2 <- do.call(rbind.fill,series_other_merge1)
-                                                                 
-                                                                 series_other_merge <-  create_sub_index_sequence(data=series_other_merge2,index_val=series_index_val2,
-                                                                                                                  sub_index_val=series_other_sub_index_val2,nonindex_prefix="")
-                                                                 
-                                                                 rm(series_data_temp,series_other_merge1,series_other_merge2)
-                                                                 
-                                                               } else {
-                                                                 
-                                                                 series_other_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                 colnames(series_other_merge) <- c("file",series_index_val2,head(series_other_sub_index_val2,1))
-                                                                 
-                                                               }
-                                                               rm(series_other_sub_index_val,series_other_sub_index_val2)
-                                                               
-                                                               #Series Section - Class Contract
-                                                               series_class_contract_sub_index_val <- "CLASS_CONTRACT"
-                                                               series_class_contract_sub_index_val2 <- paste(series_class_contract_sub_index_val,"INDEX",sep="_")
-                                                               
-                                                               if(series_index_flag) {
-                                                                 
-                                                                 series_data_temp <- webpage_sep_index[!(webpage_sep_index[,series_index_val2] %in% c(0)),]
-                                                                 row.names(series_data_temp) <- seq(nrow(series_data_temp))
-                                                                 
-                                                                 series_class_contract_merge1 <- dlply(.data=series_data_temp, .variables=c("file",series_index_val2), extract_filing_section_by_keep,
-                                                                                                       xml_col="Final_tag",tag_col="tag_short",index_col=series_index_val,
-                                                                                                       sub_index_col=series_class_contract_sub_index_val, index_flag=series_index_flag,file=file)
-                                                                 series_class_contract_merge2 <- do.call(rbind.fill,series_class_contract_merge1)
-                                                                 
-                                                                 series_class_contract_merge <-  create_sub_index_sequence(data=series_class_contract_merge2,index_val=series_index_val2,
-                                                                                                                           sub_index_val=series_class_contract_sub_index_val2,nonindex_prefix="")
-                                                                 
-                                                                 rm(series_data_temp,series_class_contract_merge1,series_class_contract_merge2)
-                                                                 
-                                                               } else {
-                                                                 
-                                                                 series_class_contract_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                                 colnames(series_class_contract_merge) <- c("file",series_index_val2,head(series_class_contract_sub_index_val2,1))
-                                                                 
-                                                               }
-                                                               rm(series_class_contract_sub_index_val,series_class_contract_sub_index_val2)
-                                                               
-                                                               rm(series_index_val,series_index_val2,series_index_flag)
-                                                               
-                                                               df_comb_list <- list(series_other_merge,series_class_contract_merge)
-                                                               
-                                                               rm(series_other_merge,series_class_contract_merge)
-                                                               rm(file,filepath)
-                                                               rm(sep_tags1,sep_tags2,webpage_sep,webpage_sep_index)
-                                                               
-                                                               return(df_comb_list)
-                                                               
-                                                             },entity_encoding=entity_encoding,
-                                                             .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
-                               series_other_comb <- create_comb_df(list=trim_headings_series,list_pos=1,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               series_class_contract_comb <- create_comb_df(list=trim_headings_series,list_pos=2,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               rm(trim_headings_series)
-                               
-                               df_comb_list_all <- list(header_intro_comb,
+                               trim_headings <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
+                                                      .fun = function(y,entity_encoding){
+                                                        
+                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.hdr.sgml"),]
+                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000842939-03-000055.hdr.sgml"),]
+                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-03-054193.hdr.sgml"),]
+                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001108086-05-000062.hdr.sgml"),]
+                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000930413-10-000059.hdr.sgml"),]
+                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000078713-13-000036.hdr.sgml"),]
+                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-13-456867.hdr.sgml"),]
+                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001571049-13-000837.hdr.sgml"),]
+                                                        #y <- downloaded_files3[1,]
+                                                        
+                                                        #entity_encoding <- entity_encoding
+                                                        
+                                                        file <- unique(y[,"file"])
+                                                        filepath <- unique(y[,"filepath"])
+                                                        
+                                                        cat(file,"\n")
+                                                        
+                                                        webpage_df_xml_only_comb <- import_local_edgar_file(filepath)
+
+                                                        webpage_df_xml_only_df0 <- sapply(webpage_df_xml_only_comb, "[", 1)
+                                                        webpage_df_xml_only_df1 <- do.call(cbind,webpage_df_xml_only_df0)
+                                                        webpage_df_xml_only_df  <- as.data.frame(webpage_df_xml_only_df1,stringsAsFactors=FALSE)
+                                                        colnames(webpage_df_xml_only_df) <- c("raw","trash")
+                                                        webpage_df_xml_only_df[,"raw"] <- gsub("&NBSP;"," ",webpage_df_xml_only_df[,"raw"])
+                                                        
+                                                        webpage_df_xml_only_df[,"raw"]  <- gsub(" {2,}", " ", webpage_df_xml_only_df[,"raw"] )
+                                                        webpage_df_xml_only_df[,"raw"]  <- gsub("^\\s+|\\s+$", "", webpage_df_xml_only_df[,"raw"] )
+                                                        webpage_df_xml_only_df <- webpage_df_xml_only_df[!(is.na(webpage_df_xml_only_df[,"raw"]) | webpage_df_xml_only_df[,"raw"]==""),]         
+                                                        rm(webpage_df_xml_only_df0,webpage_df_xml_only_df1)
+                                                        
+                                                        bad_tags_df0 <- sapply(webpage_df_xml_only_comb, "[", 2)
+                                                        bad_tags_df1 <- do.call(cbind,bad_tags_df0)
+                                                        bad_tags_df  <- as.data.frame(bad_tags_df1,stringsAsFactors=FALSE)
+                                                        colnames(bad_tags_df) <- c("filepath","trash")
+                                                        #bad_tags_df_trim <- bad_tags_df[!is.na(bad_tags_df[,1]),]
+                                                        bad_tags_df_trim <- bad_tags_df
+                                                        
+                                                        rm(bad_tags_df0,bad_tags_df1,bad_tags_df)
+                                                        
+                                                        #Clean Edgar Tags
+                                                        webpage_tags_clean <- clean_edgar_tags(webpage_df_xml_only_df[,"raw"])
+                                                        
+                                                        #Fix Edgar Tags
+                                                        webpage_tags_comb <- fix_edgar_tags(webpage_tags_clean[,"raw"],entity_encoding)
+                                                        rm(webpage_tags_clean)
+                                                        
+                                                        webpage_tags0 <- webpage_tags_comb[[1]]
+                                                        webpage_tags  <- as.data.frame(webpage_tags0,stringsAsFactors=FALSE)
+                                                
+                                                        bad_tags0 <- webpage_tags_comb[[2]]
+                                                        bad_tags  <- as.data.frame(bad_tags0,stringsAsFactors=FALSE)
+                                                        
+                                                        rm(webpage_df_xml_only_df)
+                                                        
+                                                        webpage_sep <- webpage_tags
+                                                        webpage_sep[,"Final_tag"] <- ifelse(grepl("<SEC_HEADER>", webpage_sep[,"Final_tag"]), "<SEC_HEADER>", webpage_sep[,"Final_tag"])
+                                                        
+                                                        rm(webpage_tags)
+                                                        
+                                                        webpage_sep <- data.frame(webpage_sep,tag_status_open=NA,tag_status_close=NA,stringsAsFactors=FALSE)
+                                                        
+                                                        #Find all possible tags
+                                                        tags <- unique(webpage_sep[,"tag_short"])
+                                                        sep_tags1 <- find_individual_tags(data=webpage_sep,tag_raw_col="Final_tag",tags=tags,
+                                                                                          tag_open_col="tag_status_open",tag_close_col="tag_status_close")
+                                                        sep_tags1 <- sep_tags1[!(sep_tags1[,"open_count"]==0),]
+                                                        sep_tags2 <- sep_tags1[,"cleaned"]
+                                                        
+                                                        index_temp <- llply(.data=sep_tags2, create_tag_index,data=webpage_sep, tag_raw_col="Final_tag",
+                                                                            .progress = "none", .inform = FALSE,.parallel = FALSE, .paropts = NULL)
+                                                        index <- do.call(cbind, index_temp)
+                                                        index <- as.data.frame(index,stringsAsFactors=FALSE)
+                                                        colnames(index) <- paste(sep_tags2,"INDEX",sep="_")
+                                                        rm(index_temp)
+                                                        
+                                                        webpage_sep_index <- data.frame(file=file, Final_tag=webpage_sep[,"Final_tag"],tag_short=webpage_sep[,"tag_short"],index,stringsAsFactors=FALSE)
+                                                        rm(index)
+                                                        
+                                                        #Header Section - Setup
+                                                        header_index_val <- "SEC_HEADER"
+                                                        header_index_val2 <- paste(header_index_val,"INDEX",sep="_")
+                                                        header_index_flag <- (header_index_val %in% sep_tags2)
+                                                        
+                                                        #Header Section - Intro
+                                                        header_info_sub_index_val <- c("FILER","SERIES_AND_CLASSES_CONTRACTS_DATA")
+                                                        header_info_sub_index_val2 <- paste(header_info_sub_index_val,"INDEX",sep="_")
+                                                        
+                                                        if(header_index_flag) {
+                                                          
+                                                          header_data_temp <- webpage_sep_index[!(webpage_sep_index[,header_index_val2] %in% c(0)),]
+                                                          row.names(header_data_temp) <- seq(nrow(header_data_temp))
+                                                          
+                                                          #cat("\n","header_data_temp","\n")
+                                                          
+                                                          header_intro_merge1 <- dlply(.data=header_data_temp, .variables=c("file",header_index_val2), extract_filing_section_by_drop,
+                                                                                       xml_col="Final_tag",tag_col="tag_short",index_col=header_index_val,
+                                                                                       sub_index_col=header_info_sub_index_val, index_flag=header_index_flag,file=file)
+                                                          #cat("\n","header_intro_merge1","\n")
+                                                          
+                                                          header_intro_merge2 <- do.call(rbind.fill,header_intro_merge1)
+                                                          
+                                                          #cat("\n","header_intro_merge2","\n")
+                                                          
+                                                          header_intro_merge <-  create_sub_index_sequence(data=header_intro_merge2,index_val=header_index_val2,
+                                                                                                           sub_index_val=header_info_sub_index_val2,nonindex_prefix="")
+                                                          
+                                                          #cat("\n","header_intro_merge","\n")
+                                                          
+                                                          rm(header_data_temp,header_intro_merge1,header_intro_merge2)
+                                                          
+                                                          #header_intro_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          #colnames(header_intro_merge) <- c("file",header_index_val2,head(header_info_sub_index_val2,1))
+                                                          
+                                                          
+                                                        } else {
+                                                          
+                                                          header_intro_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          colnames(header_intro_merge) <- c("file",header_index_val2,head(header_info_sub_index_val2,1))
+                                                          
+                                                        }
+                                                        rm(header_info_sub_index_val,header_info_sub_index_val2)
+                                                        
+                                                        
+                                                        #Filer Section - Setup
+                                                        filer_index_val <- "FILER"
+                                                        filer_index_val2 <- paste(filer_index_val,"INDEX",sep="_")
+                                                        filer_index_flag <- (filer_index_val %in% sep_tags2)
+                                                        
+                                                        #Filer Section - Company Data
+                                                        filer_company_data_sub_index_val <- "COMPANY_DATA"
+                                                        filer_company_data_sub_index_val2 <- paste(filer_company_data_sub_index_val,"INDEX",sep="_")
+                                                        
+                                                        if(filer_index_flag) {
+                                                          
+                                                          filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
+                                                          row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
+                                                          
+                                                          filer_company_data_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
+                                                                                             xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
+                                                                                             sub_index_col=filer_company_data_sub_index_val, index_flag=filer_index_flag,file=file)
+                                                          filer_company_data_merge2 <- do.call(rbind.fill,filer_company_data_merge1)
+                                                          
+                                                          filer_company_data_merge <-  create_sub_index_sequence(data=filer_company_data_merge2,index_val=filer_index_val2,
+                                                                                                                 sub_index_val=filer_company_data_sub_index_val2,nonindex_prefix="")
+                                                          
+                                                          rm(filer_data_temp,filer_company_data_merge1,filer_company_data_merge2)
+                                                          
+                                                        } else {
+                                                          
+                                                          filer_company_data_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          colnames(filer_company_data_merge) <- c("file",filer_index_val2,head(filer_company_data_sub_index_val2,1))
+                                                          
+                                                        }
+                                                        rm(filer_company_data_sub_index_val,filer_company_data_sub_index_val2)
+                                                        
+                                                        
+                                                        #Filer Section - Filing Values
+                                                        filer_filing_values_sub_index_val <- "FILING_VALUES"
+                                                        filer_filing_values_sub_index_val2 <- paste(filer_filing_values_sub_index_val,"INDEX",sep="_")
+                                                        
+                                                        if(filer_index_flag) {
+                                                          
+                                                          filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
+                                                          row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
+                                                          
+                                                          filer_filing_values_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
+                                                                                              xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
+                                                                                              sub_index_col=filer_filing_values_sub_index_val, index_flag=filer_index_flag,file=file)
+                                                          filer_filing_values_merge2 <- do.call(rbind.fill,filer_filing_values_merge1)
+                                                          
+                                                          filer_filing_values_merge <-  create_sub_index_sequence(data=filer_filing_values_merge2,index_val=filer_index_val2,
+                                                                                                                  sub_index_val=filer_filing_values_sub_index_val2,nonindex_prefix="")
+                                                          
+                                                          rm(filer_data_temp,filer_filing_values_merge1,filer_filing_values_merge2)
+                                                          
+                                                        } else {
+                                                          
+                                                          filer_filing_values_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          colnames(filer_filing_values_merge) <- c("file",filer_index_val2,head(filer_filing_values_sub_index_val2,1))
+                                                          
+                                                        }
+                                                        rm(filer_filing_values_sub_index_val,filer_filing_values_sub_index_val2)
+                                                        
+                                                        
+                                                        #Filer Section - Business Address
+                                                        filer_business_address_sub_index_val <- "BUSINESS_ADDRESS"
+                                                        filer_business_address_sub_index_val2 <- paste(filer_business_address_sub_index_val,"INDEX",sep="_")
+                                                        
+                                                        if(filer_index_flag) {
+                                                          
+                                                          filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
+                                                          row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
+                                                          
+                                                          filer_business_address_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
+                                                                                                 xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
+                                                                                                 sub_index_col=filer_business_address_sub_index_val, index_flag=filer_index_flag,file=file)
+                                                          filer_business_address_merge2 <- do.call(rbind.fill,filer_business_address_merge1)
+                                                          
+                                                          filer_business_address_merge <-  create_sub_index_sequence(data=filer_business_address_merge2,index_val=filer_index_val2,
+                                                                                                                     sub_index_val=filer_business_address_sub_index_val2,nonindex_prefix="_BUSINESS")
+                                                          
+                                                          rm(filer_data_temp,filer_business_address_merge1,filer_business_address_merge2)
+                                                          
+                                                        } else {
+                                                          
+                                                          filer_business_address_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          colnames(filer_business_address_merge) <- c("file",filer_index_val2,head(filer_business_address_sub_index_val2,1))
+                                                          
+                                                        }
+                                                        rm(filer_business_address_sub_index_val,filer_business_address_sub_index_val2)
+                                                        
+                                                        
+                                                        #Filer Section - Mail Address
+                                                        filer_mail_address_sub_index_val <- "MAIL_ADDRESS"
+                                                        filer_mail_address_sub_index_val2 <- paste(filer_mail_address_sub_index_val,"INDEX",sep="_")
+                                                        
+                                                        if(filer_index_flag) {
+                                                          
+                                                          filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
+                                                          row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
+                                                          
+                                                          filer_mail_address_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
+                                                                                             xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
+                                                                                             sub_index_col=filer_mail_address_sub_index_val, index_flag=filer_index_flag,file=file)
+                                                          filer_mail_address_merge2 <- do.call(rbind.fill,filer_mail_address_merge1)
+                                                          
+                                                          filer_mail_address_merge <-  create_sub_index_sequence(data=filer_mail_address_merge2,index_val=filer_index_val2,
+                                                                                                                 sub_index_val=filer_mail_address_sub_index_val2,nonindex_prefix="_MAIL")
+                                                          
+                                                          rm(filer_data_temp,filer_mail_address_merge1,filer_mail_address_merge2)
+                                                          
+                                                        } else {
+                                                          
+                                                          filer_mail_address_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          colnames(filer_mail_address_merge) <- c("file",filer_index_val2,head(filer_mail_address_sub_index_val2,1))
+                                                          
+                                                        }
+                                                        rm(filer_mail_address_sub_index_val,filer_mail_address_sub_index_val2)
+                                                        
+                                                        
+                                                        #Filer Section - Former Company
+                                                        filer_former_company_sub_index_val <- "FORMER_COMPANY"
+                                                        filer_former_company_sub_index_val2 <- paste(filer_former_company_sub_index_val,"INDEX",sep="_")
+                                                        
+                                                        if(filer_index_flag) {
+                                                          
+                                                          filer_data_temp <- webpage_sep_index[!(webpage_sep_index[,filer_index_val2] %in% c(0)),]
+                                                          row.names(filer_data_temp) <- seq(nrow(filer_data_temp))
+                                                          
+                                                          filer_former_company_merge1 <- dlply(.data=filer_data_temp, .variables=c("file",filer_index_val2), extract_filing_section_by_keep,
+                                                                                               xml_col="Final_tag",tag_col="tag_short",index_col=filer_index_val,
+                                                                                               sub_index_col=filer_former_company_sub_index_val, index_flag=filer_index_flag,file=file)
+                                                          filer_former_company_merge2 <- do.call(rbind.fill,filer_former_company_merge1)
+                                                          
+                                                          filer_former_company_merge <-  create_sub_index_sequence(data=filer_former_company_merge2,index_val=filer_index_val2,
+                                                                                                                   sub_index_val=filer_former_company_sub_index_val2,nonindex_prefix="")
+                                                          
+                                                          rm(filer_data_temp,filer_former_company_merge1,filer_former_company_merge2)
+                                                          
+                                                        } else {
+                                                          
+                                                          filer_former_company_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          colnames(filer_former_company_merge) <- c("file",filer_index_val2,head(filer_former_company_sub_index_val2,1))
+                                                          
+                                                        }
+                                                        rm(filer_former_company_sub_index_val,filer_former_company_sub_index_val2)
+                                                        
+                                                        
+                                                        rm(filer_index_val,filer_index_val2,filer_index_flag)
+                                                        
+                                                        #Series Section - Setup
+                                                        series_index_val <- "SERIES"
+                                                        series_index_val2 <- paste(series_index_val,"INDEX",sep="_")
+                                                        series_index_flag <- (series_index_val %in% sep_tags2)
+                                                        
+                                                        #Series Section - Other
+                                                        series_other_sub_index_val <- "CLASS_CONTRACT"
+                                                        series_other_sub_index_val2 <- paste(series_other_sub_index_val,"INDEX",sep="_")
+                                                        
+                                                        if(series_index_flag) {
+                                                          
+                                                          series_data_temp <- webpage_sep_index[!(webpage_sep_index[,series_index_val2] %in% c(0)),]
+                                                          row.names(series_data_temp) <- seq(nrow(series_data_temp))
+                                                          
+                                                          series_other_merge1 <- dlply(.data=series_data_temp, .variables=c("file",series_index_val2), extract_filing_section_by_drop,
+                                                                                       xml_col="Final_tag",tag_col="tag_short",index_col=series_index_val,
+                                                                                       sub_index_col=series_other_sub_index_val, index_flag=series_index_flag,file=file)
+                                                          series_other_merge2 <- do.call(rbind.fill,series_other_merge1)
+                                                          
+                                                          series_other_merge <-  create_sub_index_sequence(data=series_other_merge2,index_val=series_index_val2,
+                                                                                                           sub_index_val=series_other_sub_index_val2,nonindex_prefix="")
+                                                          
+                                                          rm(series_data_temp,series_other_merge1,series_other_merge2)
+                                                          
+                                                        } else {
+                                                          
+                                                          series_other_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          colnames(series_other_merge) <- c("file",series_index_val2,head(series_other_sub_index_val2,1))
+                                                          
+                                                        }
+                                                        rm(series_other_sub_index_val,series_other_sub_index_val2)
+                                                        
+                                                        #Series Section - Class Contract
+                                                        series_class_contract_sub_index_val <- "CLASS_CONTRACT"
+                                                        series_class_contract_sub_index_val2 <- paste(series_class_contract_sub_index_val,"INDEX",sep="_")
+                                                        
+                                                        if(series_index_flag) {
+                                                          
+                                                          series_data_temp <- webpage_sep_index[!(webpage_sep_index[,series_index_val2] %in% c(0)),]
+                                                          row.names(series_data_temp) <- seq(nrow(series_data_temp))
+                                                          
+                                                          series_class_contract_merge1 <- dlply(.data=series_data_temp, .variables=c("file",series_index_val2), extract_filing_section_by_keep,
+                                                                                                xml_col="Final_tag",tag_col="tag_short",index_col=series_index_val,
+                                                                                                sub_index_col=series_class_contract_sub_index_val, index_flag=series_index_flag,file=file)
+                                                          series_class_contract_merge2 <- do.call(rbind.fill,series_class_contract_merge1)
+                                                          
+                                                          series_class_contract_merge <-  create_sub_index_sequence(data=series_class_contract_merge2,index_val=series_index_val2,
+                                                                                                                    sub_index_val=series_class_contract_sub_index_val2,nonindex_prefix="")
+                                                          
+                                                          rm(series_data_temp,series_class_contract_merge1,series_class_contract_merge2)
+                                                          
+                                                        } else {
+                                                          
+                                                          series_class_contract_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
+                                                          colnames(series_class_contract_merge) <- c("file",series_index_val2,head(series_class_contract_sub_index_val2,1))
+                                                          
+                                                        }
+                                                        rm(series_class_contract_sub_index_val,series_class_contract_sub_index_val2)
+                                                        
+                                                        rm(series_index_val,series_index_val2,series_index_flag)
+                                                        
+                                                        
+                                                        df_comb_list <- list(bad_tags_df_trim,header_intro_merge,
+                                                                             filer_company_data_merge,filer_filing_values_merge,filer_business_address_merge, filer_mail_address_merge,filer_former_company_merge,
+                                                                             series_other_merge,series_class_contract_merge)
+                                                        
+                                                        rm(bad_tags_df_trim,header_intro_merge)
+                                                        rm(filer_company_data_merge,filer_filing_values_merge,filer_business_address_merge, filer_mail_address_merge,filer_former_company_merge)
+                                                        rm(series_other_merge,series_class_contract_merge)
+                                                        rm(file,filepath)
+                                                        rm(sep_tags1,sep_tags2,webpage_sep,webpage_sep_index)
+                                                        
+                                                        return(df_comb_list)
+                                                        
+                                                      },entity_encoding=entity_encoding,
+                                                      .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+              
+                               bad_files_comb0 <- sapply(trim_headings, "[", 1)
+                               bad_files_comb1 <- do.call(rbind,bad_files_comb0)
+                               bad_files_comb  <- as.data.frame(bad_files_comb1,stringsAsFactors=FALSE)
+                               colnames(bad_files_comb) <- c("filepath","trash")
+                               row.names(bad_files_comb) <- seq(nrow(bad_files_comb))
+                               rm(bad_files_comb0,bad_files_comb1)
+                         
+                               header_intro_comb <- create_comb_df(list=trim_headings,list_pos=2,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
+                               filer_company_data_comb <- create_comb_df(list=trim_headings,list_pos=3,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
+                               filer_filing_values_comb <- create_comb_df(list=trim_headings,list_pos=4,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
+                               filer_business_address_comb <- create_comb_df(list=trim_headings,list_pos=5,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
+                               filer_mail_address_comb <- create_comb_df(list=trim_headings,list_pos=6,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
+                               filer_former_company_comb <- create_comb_df(list=trim_headings,list_pos=7,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
+                               series_other_comb <- create_comb_df(list=trim_headings,list_pos=8,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
+                               series_class_contract_comb <- create_comb_df(list=trim_headings,list_pos=9,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
+
+                               rm(trim_headings)
+                              
+                               df_comb_list_all <- list(bad_files_comb,header_intro_comb,
                                                         filer_company_data_comb,filer_filing_values_comb,filer_business_address_comb, filer_mail_address_comb,filer_former_company_comb,
                                                         series_other_comb,series_class_contract_comb)
                                
-                               rm(header_intro_comb)
+                               rm(bad_files_comb,header_intro_comb)
                                rm(filer_company_data_comb,filer_filing_values_comb,filer_business_address_comb,filer_mail_address_comb,filer_former_company_comb)
                                rm(series_other_comb,series_class_contract_comb)
                                rm(yr,yr_folder_path,sub_folder_path,downloaded_files3)
@@ -1467,15 +673,23 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
 ###############################################################################
 cat("Seperate Data \n")
 ###############################################################################
-  
-header_intro_final <- create_comb_df_overall(list=filings_header_info,list_pos=1,filing_info_file_col="file_header")
-filer_company_data_final <- create_comb_df_overall(list=filings_header_info,list_pos=2,filing_info_file_col="file_header")
-filer_filing_values_final <- create_comb_df_overall(list=filings_header_info,list_pos=3,filing_info_file_col="file_header")
-filer_business_address_final <- create_comb_df_overall(list=filings_header_info,list_pos=4,filing_info_file_col="file_header")
-filer_mail_address_final <- create_comb_df_overall(list=filings_header_info,list_pos=5,filing_info_file_col="file_header")
-filer_former_company_final  <- create_comb_df_overall(list=filings_header_info,list_pos=6,filing_info_file_col="file_header")
-series_other_final <- create_comb_df_overall(list=filings_header_info,list_pos=7,filing_info_file_col="file_header")
-series_class_contract_final  <- create_comb_df_overall(list=filings_header_info,list_pos=8,filing_info_file_col="file_header")
+
+bad_files_final0 <- sapply(filings_header_info, "[", 1)
+bad_files_final1 <- do.call(rbind,bad_files_final0)
+bad_files_final2  <- as.data.frame(bad_files_final1,stringsAsFactors=FALSE)
+colnames(bad_files_final2) <- c("filepath","trash")
+row.names(bad_files_final2) <- seq(nrow(bad_files_final2))
+bad_files_final <- bad_files_final2[!is.na(bad_files_final2[,1]),]
+rm(bad_files_final0,bad_files_final1,bad_files_final2)
+
+header_intro_final <- create_comb_df_overall(list=filings_header_info,list_pos=2,filing_info_file_col="file_header")
+filer_company_data_final <- create_comb_df_overall(list=filings_header_info,list_pos=3,filing_info_file_col="file_header")
+filer_filing_values_final <- create_comb_df_overall(list=filings_header_info,list_pos=4,filing_info_file_col="file_header")
+filer_business_address_final <- create_comb_df_overall(list=filings_header_info,list_pos=5,filing_info_file_col="file_header")
+filer_mail_address_final <- create_comb_df_overall(list=filings_header_info,list_pos=6,filing_info_file_col="file_header")
+filer_former_company_final  <- create_comb_df_overall(list=filings_header_info,list_pos=7,filing_info_file_col="file_header")
+series_other_final <- create_comb_df_overall(list=filings_header_info,list_pos=8,filing_info_file_col="file_header")
+series_class_contract_final  <- create_comb_df_overall(list=filings_header_info,list_pos=9,filing_info_file_col="file_header")
 
 
 ###############################################################################
@@ -1485,6 +699,9 @@ cat("Output Combined Files \n")
 #Check to see if yr folder exists.  If not, create it.
 out_folder_path <- paste(download_folder_path, headercombfolder, sep = "\\", collapse = "\\")   
 create_directory(out_folder_path,remove=1)
+
+write.table(bad_files_final,file=paste(out_folder_path,"\\","bad_files_final",".csv",sep=""), append=FALSE, na="NA", 
+            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
 
 write.table(header_intro_final,file=paste(out_folder_path,"\\","header_intro_final",".csv",sep=""), append=FALSE, na="NA", 
             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
