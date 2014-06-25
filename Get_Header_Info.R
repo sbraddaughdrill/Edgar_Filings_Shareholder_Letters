@@ -32,7 +32,7 @@ options(max.print = 500)
 #memory.limit(size = 8183)
 
 # Set location (1=HOME,2=WORK,3=LAPTOP,4=CORALSEA FROM HOME,5=CORALSEA FROM WORK,6=CORALSEA FROM LAPTOP)
-Location <- 3
+Location <- 1
 
 if (Location == 1) {
   #setwd("C:/Research_temp3/")
@@ -244,11 +244,89 @@ rm(entity_encoding0,entity_encoding_clean)
 
 
 ###############################################################################
+cat("Import HTML tags \n")
+###############################################################################
+
+#html_tags0 <- read.csv(file=paste(output_directory,"HTML_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+html_tags0 <- read.table(file=paste(output_directory,"HTML_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
+                         sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+
+#Clean
+html_tags_clean <- html_tags0
+
+for(i in which(sapply(html_tags_clean,class)=="character"))
+{
+  html_tags_clean[[i]] = trim(html_tags_clean[[i]])
+}
+rm(i)
+
+for (i in 1:ncol(html_tags_clean))
+{
+  html_tags_clean[,i] <- unknownToNA(html_tags_clean[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                                                    NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                                                    NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+  html_tags_clean[,i] <- ifelse(is.na(html_tags_clean[,i]),NA, html_tags_clean[,i])
+} 
+rm(i)
+
+html_tags1 <- html_tags_clean[!is.na(html_tags_clean[,"START_TAG"]),]
+row.names(html_tags1) <- seq(nrow(html_tags1))
+
+html_tags <- html_tags1[,c("START_TAG","END_TAG","TAG_SHORT","IGNORE_CLOSING")]
+#html_tags[,"START_TAG"] <- gsub("-","_",html_tags[,"START_TAG"])
+#html_tags[,"END_TAG"] <- gsub("-","_",html_tags[,"END_TAG"])
+#html_tags[,"TAG_SHORT"] <- gsub("-","_",html_tags[,"TAG_SHORT"])
+html_tags <- unique(html_tags)
+row.names(html_tags) <- seq(nrow(html_tags))
+
+rm(html_tags0,html_tags1,html_tags_clean)
+
+
+###############################################################################
+cat("Import SEC tags \n")
+###############################################################################
+
+#sec_tags0 <- read.csv(file=paste(output_directory,"SEC_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+sec_tags0 <- read.table(file=paste(output_directory,"SEC_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
+                        sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+
+#Clean
+sec_tags_clean <- sec_tags0
+
+for(i in which(sapply(sec_tags_clean,class)=="character"))
+{
+  sec_tags_clean[[i]] = trim(sec_tags_clean[[i]])
+}
+rm(i)
+
+for (i in 1:ncol(sec_tags_clean))
+{
+  sec_tags_clean[,i] <- unknownToNA(sec_tags_clean[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                                                  NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                                                  NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+  sec_tags_clean[,i] <- ifelse(is.na(sec_tags_clean[,i]),NA, sec_tags_clean[,i])
+} 
+rm(i)
+
+sec_tags1 <- sec_tags_clean[!is.na(sec_tags_clean[,"START_TAG"]),]
+row.names(sec_tags1) <- seq(nrow(sec_tags1))
+
+sec_tags <- sec_tags1[,c("START_TAG","END_TAG","TAG_SHORT","IGNORE_CLOSING")]
+#sec_tags[,"START_TAG"] <- gsub("-","_",sec_tags[,"START_TAG"])
+#sec_tags[,"END_TAG"] <- gsub("-","_",sec_tags[,"END_TAG"])
+#sec_tags[,"TAG_SHORT"] <- gsub("-","_",sec_tags[,"TAG_SHORT"])
+sec_tags <- unique(sec_tags)
+row.names(sec_tags) <- seq(nrow(sec_tags))
+
+rm(sec_tags0,sec_tags1,sec_tags_clean)
+
+
+###############################################################################
 cat("Get header information \n")
 ###############################################################################
 
 filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"), 
-                             .fun = function(x, path_output,subfolder,entity_encoding){
+                             .fun = function(x, path_output,subfolder,entity_encoding,html_tags,sec_tags){
                                
                                #x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
                                #x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
@@ -264,6 +342,8 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                #path_output <- paste(output_directory,downloadfolder,sep=slash)
                                #subfolder <- headerfolder
                                #entity_encoding <- entity_encoding
+                               #html_tags <- html_tags
+                               #sec_tags <- sec_tags
                                
                                filings_trim2_short <- x[,!(colnames(x) %in% c("file_txt","file_index_htm"))]
                                
@@ -299,7 +379,7 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                rm(downloaded_files2)
                                
                                trim_headings <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                                      .fun = function(y,entity_encoding){
+                                                      .fun = function(y,entity_encoding,html_tags,sec_tags){
                                                         
                                                         #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.hdr.sgml"),]
                                                         #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000842939-03-000055.hdr.sgml"),]
@@ -329,6 +409,7 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                         webpage_df_xml_only_df[,"raw"]  <- gsub(" {2,}", " ", webpage_df_xml_only_df[,"raw"] )
                                                         webpage_df_xml_only_df[,"raw"]  <- gsub("^\\s+|\\s+$", "", webpage_df_xml_only_df[,"raw"] )
                                                         webpage_df_xml_only_df <- webpage_df_xml_only_df[!(is.na(webpage_df_xml_only_df[,"raw"]) | webpage_df_xml_only_df[,"raw"]==""),]         
+                                                        
                                                         rm(webpage_df_xml_only_df0,webpage_df_xml_only_df1)
                                                         
                                                         bad_tags_df0 <- sapply(webpage_df_xml_only_comb, "[", 2)
@@ -340,18 +421,24 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                         
                                                         rm(bad_tags_df0,bad_tags_df1,bad_tags_df)
                                                         
-                                                        #Clean Edgar Tags
+                                                        #Clean Tags
                                                         webpage_tags_clean <- clean_edgar_tags(webpage_df_xml_only_df[,"raw"])
                                                         
-                                                        #Fix Edgar Tags
-                                                        webpage_tags_comb <- fix_edgar_tags(webpage_tags_clean[,"raw"],entity_encoding)
+                                                        #Expand Tags
+                                                        webpage_tags_expand <- expand_edgar_tags(webpage_tags_clean[,"raw"],html_tags,sec_tags)
                                                         rm(webpage_tags_clean)
+                                                        
+                                                        #Fix Edgar Tags
+                                                        webpage_tags_comb <- fix_edgar_tags(webpage_tags_expand,entity_encoding,html_tags,sec_tags)
+                                                        rm(webpage_tags_expand)
                                                         
                                                         webpage_tags0 <- webpage_tags_comb[[1]]
                                                         webpage_tags  <- as.data.frame(webpage_tags0,stringsAsFactors=FALSE)
-                                                
+                                                        rm(webpage_tags0)
+                                                        
                                                         bad_tags0 <- webpage_tags_comb[[2]]
                                                         bad_tags  <- as.data.frame(bad_tags0,stringsAsFactors=FALSE)
+                                                        rm(bad_tags0)
                                                         
                                                         rm(webpage_df_xml_only_df)
                                                         
@@ -361,9 +448,9 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                         rm(webpage_tags)
                                                         
                                                         webpage_sep <- data.frame(webpage_sep,tag_status_open=NA,tag_status_close=NA,stringsAsFactors=FALSE)
-                                                        
+                                                  
                                                         #Find all possible tags
-                                                        tags <- unique(webpage_sep[,"tag_short"])
+                                                        tags <- unique(webpage_sep[,"col01_tag_short"])
                                                         sep_tags1 <- find_individual_tags(data=webpage_sep,tag_raw_col="Final_tag",tags=tags,
                                                                                           tag_open_col="tag_status_open",tag_close_col="tag_status_close")
                                                         sep_tags1 <- sep_tags1[!(sep_tags1[,"open_count"]==0),]
@@ -376,7 +463,9 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                         colnames(index) <- paste(sep_tags2,"INDEX",sep="_")
                                                         rm(index_temp)
                                                         
-                                                        webpage_sep_index <- data.frame(file=file, Final_tag=webpage_sep[,"Final_tag"],tag_short=webpage_sep[,"tag_short"],index,stringsAsFactors=FALSE)
+                                                        webpage_sep_index <- data.frame(file=file, Final_tag_temp=webpage_sep[,"Final_tag"],tag_short_temp=webpage_sep[,"col01_tag_short"],index,stringsAsFactors=FALSE)
+                                                        colnames(webpage_sep_index)[match("Final_tag_temp",names(webpage_sep_index))] <- "Final_tag"
+                                                        colnames(webpage_sep_index)[match("tag_short_temp",names(webpage_sep_index))] <- "tag_short"
                                                         rm(index)
                                                         
                                                         #Header Section - Setup
@@ -645,7 +734,8 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                         
                                                         return(df_comb_list)
                                                         
-                                                      },entity_encoding=entity_encoding,
+                                                      },
+                                                      entity_encoding=entity_encoding,html_tags=html_tags,sec_tags=sec_tags,
                                                       .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
               
                                bad_files_comb0 <- sapply(trim_headings, "[", 1)
@@ -680,6 +770,7 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                              },
                              path_output=paste(output_directory,downloadfolder,sep=slash),
                              subfolder=headerfolder,entity_encoding=entity_encoding,
+                             html_tags=html_tags,sec_tags=sec_tags,
                              .progress = "text",.inform = TRUE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
 
 ###############################################################################

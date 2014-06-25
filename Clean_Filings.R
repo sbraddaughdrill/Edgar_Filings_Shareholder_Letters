@@ -4,7 +4,7 @@
 # File:    Clean_Filings.R
 # Version: 1.0
 # Date:    06.10.2014
-# Purpose: Extract individual filing
+# Purpose: Clean individual filings
 ###############################################################################
 
 ###############################################################################
@@ -32,7 +32,7 @@ options(max.print = 500)
 #memory.limit(size = 8183)
 
 # Set location (1=HOME,2=WORK,3=LAPTOP,4=CORALSEA FROM HOME,5=CORALSEA FROM WORK,6=CORALSEA FROM LAPTOP)
-Location <- 3
+Location <- 1
 
 if (Location == 1) {
   #setwd("C:/Research_temp3/")
@@ -94,14 +94,13 @@ cat("SECTION: FUNCTIONS", "\n")
 source(file=paste(function_directory,"functions_text_parse.R",sep="\\"),echo=FALSE)
 source(file=paste(function_directory,"functions_utilities.R",sep="\\"),echo=FALSE)
 
-
 ###############################################################################
 # LIBRARIES;
 cat("SECTION: LIBRARIES", "\n")
 ###############################################################################
 
 #Load External Packages
-external_packages <- c("gdata","plyr","XML")
+external_packages <- c("data.table","gdata","plyr","stringr","XML")
 invisible(unlist(sapply(external_packages,load_external_packages, repo_str=repo, simplify=FALSE, USE.NAMES=FALSE)))
 installed_packages <- list_installed_packages(external_packages)
 
@@ -140,13 +139,11 @@ downloadfolder <- "MF_Shareholder_Reports_N-CSR-A"
 #downloadfolder <- "MF_Shareholder_Reports_N-CSRS"
 #downloadfolder <- "MF_Shareholder_Reports_N-CSRS-A"
 
-filetype <- c("N-CSR","N-CSR/A","N-CSRS","N-CSRS/A")
-
 #The sub directory where the downloaded filings are
-headerfolder <- "txt"
+txtfolder <- "txt_extract"
 
 #The sub directory where the combined filings will be located
-headercombfolder <- "txt"
+txtfolder_clean <- "txt_clean"
 
 #The file that will contain the filings you want to download.
 infile <- "filings_list_comb.csv"
@@ -210,65 +207,26 @@ rm(filings_trim)
 
 
 ###############################################################################
-cat("Import HTML entities \n")
-###############################################################################
-
-#Encode HTML entities
-#entity_encoding0 <- read.csv(file=paste(output_directory,"Entity_encoding.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-entity_encoding0 <- read.table(file=paste(output_directory,"Entity_encoding.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
-                               sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-
-#Clean
-entity_encoding_clean <- entity_encoding0
-#for(i in 1:ncol(entity_encoding_clean))
-#{
-#  entity_encoding_clean[,i] <- iconv(entity_encoding_clean[,i], "latin1", "ASCII", sub="")
-#}
-
-for(i in which(sapply(entity_encoding_clean,class)=="character"))
-{
-  entity_encoding_clean[[i]] = trim(entity_encoding_clean[[i]])
-}
-rm(i)
-
-for (i in 1:ncol(entity_encoding_clean))
-{
-  entity_encoding_clean[,i] <- unknownToNA(entity_encoding_clean[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                                NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                                NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-  entity_encoding_clean[,i] <- ifelse(is.na(entity_encoding_clean[,i]),NA, entity_encoding_clean[,i])
-} 
-rm(i)
-
-entity_encoding <- entity_encoding_clean[(!(is.na(entity_encoding_clean[,"ASCII.Looks.Like"])) & 
-                                            !(is.na(entity_encoding_clean[,"Entity.Encoding"]))),]
-row.names(entity_encoding) <- seq(nrow(entity_encoding))
-
-rm(entity_encoding0,entity_encoding_clean)
-
-
-###############################################################################
-cat("Get header information \n")
+cat("Clean Files \n")
 ###############################################################################
 
 filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"), 
-                             .fun = function(x, path_output,subfolder,entity_encoding){
+                             .fun = function(x, path_output,subfolder,subfolder_output){
                                
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2005),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2006),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2007),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2008),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2009),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2010),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2011),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2012),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2013),]
-                               #path_output <- paste(output_directory,downloadfolder,sep=slash)
-                               #subfolder <- headerfolder
-                               #entity_encoding <- entity_encoding
-                               #filetype <- filetype
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2005),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2006),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2007),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2008),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2009),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2010),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2011),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2012),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2013),]
+                               #  path_output <- paste(output_directory,downloadfolder,sep=slash)
+                               #  subfolder <- txtfolder
+                               #  subfolder_output <- txtfolder_clean
                                
                                filings_trim2_short <- x[,!(colnames(x) %in% c("file_header","file_index_htm"))]
                                
@@ -282,6 +240,9 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                
                                sub_folder_path <- paste(yr_folder_path, subfolder, sep = "\\", collapse = "\\")   
                                create_directory(sub_folder_path,remove=1)
+                               
+                               sub_folder_output_path <- paste(yr_folder_path, subfolder_output, sep = "\\", collapse = "\\")   
+                               create_directory(sub_folder_output_path,remove=1)
                                
                                #Get name of downloaded files
                                downloaded_files <- data.frame(file=list.files(sub_folder_path),stringsAsFactors=FALSE)
@@ -303,249 +264,316 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                
                                rm(downloaded_files2)
                                
-                               trim_headings <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                                      .fun = function(y,entity_encoding,filetype){
-                                                        
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.txt"),]
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000088053-03-000790.txt"),]
-                                                        
-                                                        #entity_encoding <- entity_encoding
-                                                        #filetype <- filetype
-                                                        
-                                                        file <- unique(y[,"file"])
-                                                        filepath <- unique(y[,"filepath"])
-                                                        
-                                                        cat(file,"\n")
-                                                        
-                                                        webpage_df_xml_only_comb <- import_local_edgar_file(filepath)
-                                                        
-                                                        webpage_df_xml_only_df0 <- sapply(webpage_df_xml_only_comb, "[", 1)
-                                                        webpage_df_xml_only_df1 <- do.call(cbind,webpage_df_xml_only_df0)
-                                                        webpage_df_xml_only_df  <- as.data.frame(webpage_df_xml_only_df1,stringsAsFactors=FALSE)
-                                                        colnames(webpage_df_xml_only_df) <- c("raw","trash")
-                                                        webpage_df_xml_only_df[,"raw"] <- gsub("&NBSP;"," ",webpage_df_xml_only_df[,"raw"])
-                                                        
-                                                        webpage_df_xml_only_df[,"raw"]  <- gsub(" {2,}", " ", webpage_df_xml_only_df[,"raw"] )
-                                                        webpage_df_xml_only_df[,"raw"]  <- gsub("^\\s+|\\s+$", "", webpage_df_xml_only_df[,"raw"] )
-                                                        #webpage_df_xml_only_df <- webpage_df_xml_only_df[!(is.na(webpage_df_xml_only_df[,"raw"]) | webpage_df_xml_only_df[,"raw"]==""),]
-                                                        
-                                                        rm(webpage_df_xml_only_df0,webpage_df_xml_only_df1)
-                                                        
-                                                        bad_tags_df0 <- sapply(webpage_df_xml_only_comb, "[", 2)
-                                                        bad_tags_df1 <- do.call(cbind,bad_tags_df0)
-                                                        bad_tags_df  <- as.data.frame(bad_tags_df1,stringsAsFactors=FALSE)
-                                                        colnames(bad_tags_df) <- c("filepath","trash")
-                                                        #bad_tags_df_trim <- bad_tags_df[!is.na(bad_tags_df[,1]),]
-                                                        bad_tags_df_trim <- bad_tags_df
-                                                        
-                                                        rm(bad_tags_df0,bad_tags_df1,bad_tags_df)
-                                                        
-                                                        #Clean Edgar Tags
-                                                        webpage_tags_clean <- clean_edgar_tags(webpage_df_xml_only_df[,"raw"])
-                                                        
-                                                        #Replace hyphens
-                                                        webpage_tags_clean[,"raw"] <- gsub("SEC-DOCUMENT","SEC_DOCUMENT",webpage_tags_clean[,"raw"])
-                                                        webpage_tags_clean[,"raw"] <- gsub("SEC-HEADER","SEC_HEADER",webpage_tags_clean[,"raw"])
-                                                        webpage_tags_clean[,"raw"] <- gsub("ACCEPTANCE-DATETIME","ACCEPTANCE_DATETIME",webpage_tags_clean[,"raw"])
-                                                        
-                                                        
-                                                        #Find Tags Edgar tags
-                                                        webpage_tags0 <- data.frame(raw=webpage_tags_clean[,"raw"],
-                                                                                    tag=NA,
-                                                                                    tag_short=NA,
-                                                                                    tag_first_word=NA,
-                                                                                    stringsAsFactors=FALSE)
-                                                        
-                                                        webpage_tags0[,"tag"] <-  gsub(".*?<(.*?)>.*", "\\1", webpage_tags0[,"raw"]) 
-                                                        
-                                                        webpage_tags <- webpage_tags0
-                                                        webpage_tags[,"tag"] <-  ifelse((grepl(".*?<(.*?)>.*", webpage_tags[,"raw"])), webpage_tags[,"tag"], NA)
-                                                        webpage_tags[,"tag_short"] <- gsub("/", "", webpage_tags[,"tag"])
-                                                        
-
-                                                        
-                                                        tags <-  c("SEC_DOCUMENT","SEC_HEADER","DOCUMENT","TYPE","SEQUENCE","FILENAME","DESCRIPTION","TEXT","TABLE")
-                                                        webpage_tags[,"tag"] <- ifelse(webpage_tags[,"tag_short"] %in% tags, webpage_tags[,"tag"], NA)
-                                                        webpage_tags[,"tag_short"] <- ifelse(webpage_tags[,"tag_short"] %in% tags, webpage_tags[,"tag_short"], NA)
-                                                        colnames(webpage_tags)[1] <- "Final_tag"
-                                                        
-                                                        rm(webpage_df_xml_only_df)
-                                                        
-                                                        webpage_sep <- webpage_tags
-                                                        webpage_sep[,"Final_tag"] <- ifelse(grepl("<SEC_DOCUMENT>", webpage_sep[,"Final_tag"]), "<SEC_DOCUMENT>", webpage_sep[,"Final_tag"])
-
-                                                        webpage_sep <- data.frame(webpage_sep,tag_status_open=NA,tag_status_close=NA,stringsAsFactors=FALSE)
+                               output_files <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
+                                                     .fun = function(y,sub_folder_output_path){
                                                        
-                                                        #Find all possible tags
-                                                        tags <- tags        
-                                                        sep_tags1 <- find_individual_tags(data=webpage_sep,tag_raw_col="Final_tag",tags=tags,
-                                                                                          tag_open_col="tag_status_open",tag_close_col="tag_status_close")
-                                                        sep_tags1 <- sep_tags1[!(sep_tags1[,"open_count"]==0),]
-                                                        sep_tags2 <- sep_tags1[,"cleaned"]
-               
-                                                        index_temp <- llply(.data=sep_tags2, create_tag_index,data=webpage_sep, tag_raw_col="Final_tag",
-                                                                            .progress = "none", .inform = FALSE,.parallel = FALSE, .paropts = NULL)
-                                                        index <- do.call(cbind, index_temp)
-                                                        index <- as.data.frame(index,stringsAsFactors=FALSE)
-                                                        colnames(index) <- paste(sep_tags2,"INDEX",sep="_")
-                                                        rm(index_temp)
-                                                        
-                                                        webpage_sep_index0 <- data.frame(file=file, Final_tag=webpage_sep[,"Final_tag"],tag_short=webpage_sep[,"tag_short"],index,stringsAsFactors=FALSE)
-                                                        rm(index)
-                                                        
-                                                        #Remove Header Info
-                                                        if(c("SEC_DOCUMENT_INDEX") %in% colnames(webpage_sep_index0)) {
-                                                          
-                                                          webpage_sep_index1 <- webpage_sep_index0[!(webpage_sep_index0[,c("SEC_DOCUMENT_INDEX")]==0),]
-                                                          
-                                                        } else {
-                                                          
-                                                          #cat("NO SEC_DOCUMENT SECTION","\n")
-                                                          
-                                                          webpage_sep_index1 <- webpage_sep_index0
-                                                          
-                                                        }
-                                                        
-                                                        #Remove Tables
-                                                        if(c("TABLE_INDEX") %in% colnames(webpage_sep_index1)) {
-                                                          
-                                                          webpage_sep_index2 <- webpage_sep_index1[webpage_sep_index1[,c("TABLE_INDEX")]==0,]
-                                                          
-                                                        } else {
-                                                          
-                                                          #cat("NO TABLES","\n")
-                                                          
-                                                          webpage_sep_index2 <- webpage_sep_index1
-                                                          
-                                                        }
-                                                        
-                                                        webpage_sep_index <- webpage_sep_index2
-                                                        rm(webpage_sep_index0,webpage_sep_index1,webpage_sep_index2)
-                                                        
-                                                        #Document Section - Setup
-                                                        document_index_val <- "SEC_DOCUMENT"
-                                                        document_index_val2 <- paste(document_index_val,"INDEX",sep="_")
-                                                        document_index_flag <- (document_index_val %in% sep_tags2)
-                                                        
-                                                        #Document Section - Company Data
-                                                        document_company_data_sub_index_val <- "DOCUMENT"
-                                                        document_company_data_sub_index_val2 <- paste(document_company_data_sub_index_val,"INDEX",sep="_")
-                                                        
-                                                        if(document_index_flag) {
-                                                          
-                                                          document_data_temp <- webpage_sep_index[!(webpage_sep_index[,document_index_val2] %in% c(0)),]
-                                                          row.names(document_data_temp) <- seq(nrow(document_data_temp))
-                                                          
-                                                          document_company_data_merge1 <- dlply(.data=document_data_temp, .variables=c("file",document_index_val2), extract_filing_section_by_keep,
-                                                                                                xml_col="Final_tag",tag_col="tag_short",index_col=document_index_val,
-                                                                                                sub_index_col=document_company_data_sub_index_val, index_flag=document_index_flag,file=file)
-                                                          document_company_data_merge2 <- do.call(rbind.fill,document_company_data_merge1)
-                                                          
-                                                          document_company_data_merge <-  create_sub_index_sequence(data=document_company_data_merge2,index_val=document_index_val2,
-                                                                                                                    sub_index_val=document_company_data_sub_index_val2,nonindex_prefix="")
-                                                          
-                                                          rm(document_data_temp,document_company_data_merge1,document_company_data_merge2)
-                                                          
-                                                        } else {
-                                                          
-                                                          document_company_data_merge <- data.frame(file=file,index_col=NA,sub_index_col=NA,stringsAsFactors=FALSE)
-                                                          colnames(document_company_data_merge) <- c("file",document_index_val2,head(document_company_data_sub_index_val2,1))
-                                                          
-                                                        }
-                                                        
-                                                        expand_index_cols <- c("file",document_index_val2,document_company_data_sub_index_val2)
-                                                        text_expand <- ddply(.data=document_company_data_merge, .variables=expand_index_cols, .fun = 
-                                                                               function(x,text_col) {
-                                                                                 
-                                                                                 #x <- document_company_data_merge[(document_company_data_merge[,document_index_val2]==1 & document_company_data_merge[,document_company_data_sub_index_val2]==1),]
-                                                                                 #text_col <- "TEXT"
-                                                                                 
-                                                                                 require(gdata)
-                                                                                 
-                                                                                 expand_text_no_text <- x[,colnames(x[,!(colnames(x) %in% c(text_col))])]
-                                                                                 
-                                                                                 expand_text <- strsplit(x[,text_col], "\n", fixed = FALSE, perl = FALSE, useBytes = FALSE)
-                                                                                 expand_text2 <- unlist(expand_text)
-                                                                                 expand_text3 <- as.data.frame(expand_text2,stringsAsFactors=FALSE)
-                                                                                 colnames(expand_text3) <- text_col
-                                                                                 
-                                                                                 expand_text4 <- expand_text3
-                                                                                 expand_text4[,text_col] <- gsub(" {2,}", " ", expand_text4[,text_col] )
-                                                                                 expand_text4[,text_col]  <- gsub("^\\s+|\\s+$", "", expand_text4[,text_col])
-                                                                                 expand_text4[,text_col] <- unknownToNA(expand_text4[,text_col], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                                                                                                           NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                                                                                                           NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-                                                                                 expand_text4[,text_col] <- ifelse(is.na(expand_text4[,text_col]),"",expand_text4[,text_col] )
-                                                                                 
-                                                                                 expand_text4b <- do.call(rbind, replicate(nrow(expand_text4), as.matrix(expand_text_no_text), simplify = FALSE))
-                                                                                 expand_text4b <- as.data.frame(expand_text4b,stringsAsFactors=FALSE)
-                                                                                 row.names(expand_text4b) <- seq(nrow(expand_text4b))
-                                                                                 
-                                                                                 expand_text_comb <- data.frame(expand_text4b,temp_col=expand_text4[,text_col],stringsAsFactors=FALSE)
-                                                                                 colnames(expand_text_comb)[match("temp_col",names(expand_text_comb))] <- text_col
-                                                                                 
-                                                                                 return(expand_text_comb)
-                                                                                 
-                                                                               }, text_col="TEXT", .progress = "none")
-                                                        rm(expand_index_cols,document_company_data_merge)
-                                                        
-                                                        rm(document_company_data_sub_index_val,document_company_data_sub_index_val2)
-                                                        
-                                                        rm(document_index_val,document_index_val2,document_index_flag)
-                                                        
-                                                        df_comb_list <- list(bad_tags_individual,text_expand)
-                                                        
-                                                        rm(bad_tags_df_trim,bad_tags_individual,text_expand)
-                                                        
-                                                        rm(file,filepath)
-                                                        rm(sep_tags1,sep_tags2,webpage_sep,webpage_sep_index)
-                                                        
-                                                        return(df_comb_list)
-                                                        
-                                                      },entity_encoding=entity_encoding,filetype=filetype,
-                                                      .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+                                                       # y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.csv"),]
+                                                       # y <- downloaded_files3[(downloaded_files3[,"file"]=="0000088053-03-000790.csv"),]
+                                                       # y <- downloaded_files3[(downloaded_files3[,"file"]=="0001017062-03-000375.csv"),]
+                                                       # y <- downloaded_files3[(downloaded_files3[,"file"]=="0000820027-03-000786.csv"),]
+                                                       # y <- downloaded_files3[(downloaded_files3[,"file"]=="0000950136-03-003115.csv"),]
+                                                       # y <- downloaded_files3[(downloaded_files3[,"file"]=="0000811860-04-000012.csv"),]
+                                                       
+                                                       # sub_folder_output_path <- sub_folder_output_path
+                                                       
+                                                       file <- unique(y[,"file"])
+                                                       filepath <- unique(y[,"filepath"])
+                                                       
+                                                       file_out <- file
+                                                       filepath_out <- paste(sub_folder_output_path,file_out,sep="\\")
+                                                       
+                                                       cat(file,"\n")
+                                                       
+                                                       
+                                                       filing <- read.table(file=filepath, header = TRUE, na.strings="",stringsAsFactors=FALSE, 
+                                                                            sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+                                                       
+                                                       filing_no_text0 <- filing[,!(colnames(filing) %in% c("TEXT"))]
+                                                       filing_no_text1 <- unique(filing_no_text0)
+                                                       filing_no_text2 <- data.frame(file=NA,filing_no_text1,stringsAsFactors=FALSE)
+                                                       filing_no_text2[,"file"] <- file
+                                                       rm(filing_no_text0,filing_no_text1)
+                                                       
+                                                       filing_text0 <- filing[,(colnames(filing) %in% c("DOCUMENT_INDEX","TEXT"))]
+                                                       filing_text1 <- data.frame(file=NA,filing_text0,stringsAsFactors=FALSE)
+                                                       filing_text1[,"file"] <- file
+                                                       rm(filing_text0)
+                                                       
+                                                       rm(filing)
+                                                       
+                                                       #Remove space after beginning and before end of tags
+                                                       filing_text_clean <- filing_text1
+                                                       filing_text_clean[,c("TEXT")] <- gsub("<\\s*(?!$)","<", filing_text_clean[,c("TEXT")],perl=TRUE)
+                                                       filing_text_clean[,c("TEXT")] <- gsub("</\\s*(?!$)","</", filing_text_clean[,c("TEXT")],perl=TRUE)
+                                                       filing_text_clean[,c("TEXT")] <- gsub("\\s*>",">", filing_text_clean[,c("TEXT")],perl=TRUE)
+                                                       rm(filing_text1)
+                                                       
+                                                       #for(i in which(sapply(filing_text_clean,class)=="character"))
+                                                       #  {
+                                                       #    #filing_text_clean[[i]] <- gsub(" {2,}", " ", filing_text_clean[[i]])
+                                                       #   filing_text_clean[[i]] <- trim(filing_text_clean[[i]])
+                                                       #  }
+                                                       # rm(i)
+                                                       
+                                                       for (i in 1:ncol(filing_text_clean))
+                                                       {
+                                                         filing_text_clean[,i] <- unknownToNA(filing_text_clean[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                                                                                                               NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                                                                                                               NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+                                                         filing_text_clean[,i] <- ifelse(is.na(filing_text_clean[,i]),"", filing_text_clean[,i])
+                                                       } 
+                                                       rm(i)
+                                                       
+                                                       #REMOVE TABLES           
+                                                       tags_sep <- c("TABLE")
+                                                       filing_text_table_sep <- ddply(.data=filing_text_clean,  .variables=c("file","DOCUMENT_INDEX"), 
+                                                                                      .fun = function(x,bycol,xmlcol,tags){
+                                                                                        
+                                                                                        # x <- filing_text_clean[filing_text_clean[,"DOCUMENT_INDEX"]==1,]
+                                                                                        # bycol <- c("file","DOCUMENT_INDEX")
+                                                                                        # xmlcol <- "TEXT"
+                                                                                        # tags <- tags_sep
+                                                                                        
+                                                                                        file_temp <- unique(x[,"file"])
+                                                                                        index_temp <- unique(x[,"DOCUMENT_INDEX"])
+                                                                                        
+                                                                                        #x_temp <- data.frame(x,id=NA,stringsAsFactors=FALSE)
+                                                                                        #colnames(x_temp) <- c(colnames(x),"id")
+                                                                                        #x_temp[,"id"] <- seq(1,nrow(x_temp),1)
+                                                                                        
+                                                                                        x_temp_split <- split_by_tag(x,xmlcol,tags)
+                                                                                        x_temp_split[,xmlcol] <- ifelse(x_temp_split[,xmlcol]==""," ",x_temp_split[,xmlcol])
+                                                                                        
+                                                                                        x_temp_split <- data.table(x_temp_split, key = "id")
+                                                                                        sep_temp <- x_temp_split[, list(TEXT = unlist(strsplit(TEXT, '\n', fixed=TRUE))), by = id]
+                                                                                        
+                                                                                        rm(x_temp_split)
+                                                                                        
+                                                                                        sep_temp <- sep_temp[, expand_id := sequence(.N), by = "id"]
+                                                                                        sep_temp <- as.data.frame(sep_temp,stringsAsFactors=FALSE)
+                                                                                        sep_temp <- sep_temp[,c("id","expand_id",xmlcol)]
+                                                                                        
+                                                                                        sep_temp <- sep_temp[,!(colnames(sep_temp) %in% c("id","expand_id"))]
+                                                                                        sep_temp_out <- data.frame(file=NA,index=NA,sep_temp,stringsAsFactors=FALSE)
+                                                                                        rm(sep_temp)
+                                                                                        
+                                                                                        sep_temp_out[,"file"] <- file_temp
+                                                                                        sep_temp_out[,"index"] <- index_temp
+                                                                                        colnames(sep_temp_out) <- c(bycol,xmlcol)
+                                                                                        
+                                                                                        return(sep_temp_out)
+                                                                                        
+                                                                                      }, bycol=c("file","DOCUMENT_INDEX"),xmlcol="TEXT", tags=tags_sep,
+                                                                                      .progress = "none", .inform = FALSE, .drop = FALSE, .parallel = FALSE, .paropts = NULL)
+                                                       
+                                                       rm(filing_text_clean)
+                                                       
+                                                       filing_text_table_id <- data.frame(filing_text_table_sep,table_tag_temp=NA,stringsAsFactors=FALSE)
+                                                       colnames(filing_text_table_id)[match("table_tag_temp",names(filing_text_table_id))] <- "TABLE_INDEX"
+                                                       rm(filing_text_table_sep)
+                                                       
+                                                       filing_text_table_id[,"TABLE_INDEX"] <- ifelse(grepl("<TABLE", filing_text_table_id[,"TEXT"]), "<TABLE>", filing_text_table_id[,"TABLE_INDEX"])
+                                                       filing_text_table_id[,"TABLE_INDEX"] <- ifelse(grepl("</TABLE", filing_text_table_id[,"TEXT"]), "</TABLE>", filing_text_table_id[,"TABLE_INDEX"])
+                                                       
+                                                       index_table_temp <- llply(.data=tags_sep, create_tag_index,data=filing_text_table_id, tag_raw_col="TABLE_INDEX",
+                                                                                 .progress = "none", .inform = FALSE,.parallel = FALSE, .paropts = NULL)
+                                                       index_table <- do.call(cbind, index_table_temp)
+                                                       index_table <- as.data.frame(index_table,stringsAsFactors=FALSE)
+                                                       colnames(index_table) <- paste(tags_sep,"INDEX",sep="_")
+                                                       colnames(index_table) <- gsub("-","_", colnames(index_table))
+                                                       rm(index_table_temp)
+                                                       
+                                                       filing_text_table_id[,"TABLE_INDEX"] <- index_table
+                                                       rm(index_table)
+                                                       
+                                                       if(c("TABLE_INDEX") %in% colnames(filing_text_table_id)) {
+                                                         
+                                                         filing_text_table_id_trim <- filing_text_table_id[(filing_text_table_id[,c("TABLE_INDEX")]==0),]
+                                                         
+                                                       } else {
+                                                         
+                                                         #cat("NO TABLE SECTION","\n")
+                                                         
+                                                         filing_text_table_id_trim <- filing_text_table_id
+                                                         
+                                                       }
+                                                       rm(filing_text_table_id)
+                                                       
+                                                       filing_text_table_id_trim <- filing_text_table_id_trim[,!(colnames(filing_text_table_id_trim) %in% c("TABLE_INDEX"))]
+                                                       
+                                                       
+                                                       #PARSE HTML
+                                                       filing_text_parse <- ddply(.data=filing_text_table_id_trim, .variables=c("file","DOCUMENT_INDEX"), 
+                                                                                  .fun = function(x,bycol,xmlcol){
+                                                                                    
+                                                                                    # x <- filing_text_table_id_trim[filing_text_table_id_trim[,"DOCUMENT_INDEX"]==1,]
+                                                                                    # bycol <- c("file","DOCUMENT_INDEX")
+                                                                                    # xmlcol <- "TEXT"
+                                                                                    
+                                                                                    file_temp <- unique(x[,"file"])
+                                                                                    index_temp <- unique(x[,"DOCUMENT_INDEX"])
+                                                                                    
+                                                                                    html_flag_open0 <- ifelse(grepl("<HTML>", x[,xmlcol],ignore.case = TRUE), 1, 0)
+                                                                                    html_flag_open1 <- sum(html_flag_open0, na.rm = TRUE)
+                                                                                    
+                                                                                    html_flag_close0 <- ifelse(grepl("</HTML>", x[,xmlcol],ignore.case = TRUE), 1, 0)
+                                                                                    html_flag_close1 <- sum(html_flag_close0, na.rm = TRUE)
+                                                                                    
+                                                                                    html_flag_both <-  html_flag_open1 + html_flag_close1
+                                                                                    
+                                                                                    
+                                                                                    if(html_flag_both==2) {
+                                                                                      
+                                                                                      #cat("HTML DOCUMENT","\n")
+                                                                                      
+                                                                                      #pagetree  <- htmlParse(x[,xmlcol], asText=TRUE, options = HUGE)
+                                                                                      #plain.text1 <- xpathSApply(pagetree , "//p", xmlValue)
+                                                                                      
+                                                                                      pagetree  <- htmlTreeParse( x[,xmlcol], useInternal = TRUE, options = HUGE)
+                                                                                      plain.text1 <- xpathApply(pagetree , '//p', xmlValue)
+                                                                                      plain.text1 <- unlist(plain.text1)
+                                                                                      
+                                                                                      plain.text2 <- xpathSApply(pagetree , "//text()[not(ancestor::script)][not(ancestor::style)][not(ancestor::noscript)][not(ancestor::form)]", xmlValue)
+                                                                                      
+                                                                                      plain.text3 <- xpathSApply(pagetree , "//text()", xmlValue)
+                                                                                      
+                                                                                      if(length(plain.text1)!=0) {
+                                                                                        
+                                                                                        plain.text.final <- as.data.frame(plain.text1,stringsAsFactors=FALSE)
+                                                                                        colnames(plain.text.final) <- xmlcol
+                                                                                        
+                                                                                      } else if (length(plain.text2)!=0) {
+                                                                                        
+                                                                                        plain.text.final <- as.data.frame(plain.text2,stringsAsFactors=FALSE)
+                                                                                        colnames(plain.text.final) <- xmlcol
+                                                                                        
+                                                                                      } else if (length(plain.text3)!=0) {
+                                                                                        
+                                                                                        plain.text.final <- as.data.frame(plain.text3,stringsAsFactors=FALSE)
+                                                                                        colnames(plain.text.final) <- xmlcol
+                                                                                        
+                                                                                      } else {
+                                                                                        
+                                                                                        #cat("CANNOT PARSE HTML DOCUMENT","\n")
+                                                                                        
+                                                                                        plain.text.final <- as.data.frame(x[,xmlcol],stringsAsFactors=FALSE)
+                                                                                        colnames(plain.text.final) <- xmlcol
+                                                                                        
+                                                                                      }
+                                                                                      rm(pagetree,plain.text1,plain.text2,plain.text3)
+                                                                                      
+                                                                                      plain.text.final_temp  <- data.frame(id=NA,plain.text.final,stringsAsFactors=FALSE)
+                                                                                      plain.text.final_temp[,"id"] <- seq(1,nrow(plain.text.final_temp))
+                                                                                      plain.text.final_temp[,xmlcol] <- ifelse(plain.text.final_temp[,xmlcol]==""," ",plain.text.final_temp[,xmlcol])
+                                                                                      rm(plain.text.final)
+                                                                                      
+                                                                                      plain.text.final2_dt <- data.table(plain.text.final_temp, key = "id")
+                                                                                      plain.text.final2_split <- plain.text.final2_dt[, list(TEXT = unlist(strsplit(TEXT, '\n', fixed=TRUE))), by = id]
+                                                                                      
+                                                                                      rm(plain.text.final_temp,plain.text.final2_dt)
+                                                                                      
+                                                                                      plain.text.final2_split <- plain.text.final2_split[, sep_id := sequence(.N), by = "id"]
+                                                                                      plain.text.final2_split <- as.data.frame(plain.text.final2_split,stringsAsFactors=FALSE)
+                                                                                      plain.text.final2_split <- plain.text.final2_split[,c("id","sep_id",xmlcol)]
+                                                                                      
+                                                                                      plain.text.final2_split[,xmlcol] <- gsub("\\n", " ", plain.text.final2_split[,xmlcol])
+                                                                                      plain.text.final2_split <- plain.text.final2_split[,!(colnames(plain.text.final2_split) %in% c("id","sep_id"))]
+                                                                                      
+                                                                                      plain.text.final2 <- as.data.frame(plain.text.final2_split,stringsAsFactors=FALSE)
+                                                                                      colnames(plain.text.final2) <- xmlcol
+                                                                                      rm(plain.text.final2_split)
+                                                                                      
+                                                                                      parsed_text <- data.frame(temp_file=NA,temp_index=NA,plain.text.final2,stringsAsFactors=FALSE)
+                                                                                      parsed_text[,"temp_file"] <- file_temp
+                                                                                      parsed_text[,"temp_index"] <- index_temp
+                                                                                      colnames(parsed_text) <- c(bycol,xmlcol)
+                                                                                      
+                                                                                      rm(plain.text.final2)
+                                                                                      
+                                                                                    } else if (html_flag_both==0) {
+                                                                                      
+                                                                                      #cat("NON-HTML DOCUMENT","\n")
+                                                                                      
+                                                                                      parsed_text <- data.frame(temp_file=NA,temp_index=NA,x[,xmlcol],stringsAsFactors=FALSE)
+                                                                                      parsed_text[,"temp_file"] <- file_temp
+                                                                                      parsed_text[,"temp_index"] <- index_temp
+                                                                                      colnames(parsed_text) <- c(bycol,xmlcol)
+                                                                                      
+                                                                                      
+                                                                                    } else if (html_flag_both==1) {
+                                                                                      
+                                                                                      cat("OPEN/CLOSING TAG MISMATCH","\n")
+                                                                                      
+                                                                                      parsed_text <- data.frame(temp_file=NA,temp_index=NA,plain.text2="",stringsAsFactors=FALSE)
+                                                                                      parsed_text[,"temp_file"] <- file_temp
+                                                                                      parsed_text[,"temp_index"] <- index_temp
+                                                                                      colnames(parsed_text) <- c(bycol,xmlcol)
+                                                                                      
+                                                                                    } else {
+                                                                                      
+                                                                                      cat("ERROR FINDING HTML TAGS", "\n")
+                                                                                      
+                                                                                      parsed_text <- data.frame(temp_file=NA,temp_index=NA,plain.text2="",stringsAsFactors=FALSE)
+                                                                                      parsed_text[,"temp_file"] <- file_temp
+                                                                                      parsed_text[,"temp_index"] <- index_temp
+                                                                                      colnames(parsed_text) <- c(bycol,xmlcol)
+                                                                                      
+                                                                                    }
+                                                                                    
+                                                                                    rm(html_flag_open0,html_flag_open1,html_flag_close0,html_flag_close1,html_flag_both)
+                                                                                    rm(file_temp,index_temp)
+                                                                                    
+                                                                                    return(parsed_text)
+                                                                                    
+                                                                                  }, bycol=c("file","DOCUMENT_INDEX"),xmlcol="TEXT",
+                                                                                  .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+                                                       
+                                                       rm(filing_text_table_id_trim)
+                                                       
+                                                       
+                                                       
+                                                       #OUTPUT RESULTS
+                                                       write.table(filing_text_parse,file=filepath_out, append=FALSE, na="", 
+                                                                   sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+                                                       
+                                                       
+                                                       filing_text_parse_clean_trim2 <- filing_text_parse
+                                                       filing_text_parse_clean_trim2 <- unique(filing_text_parse_clean_trim2[,!(colnames(filing_text_parse_clean_trim2) %in% c("TEXT"))])
+                                                       row.names(filing_text_parse_clean_trim2) <- seq(nrow(filing_text_parse_clean_trim2))
+                                                       rm(filing_text_parse)
+                                                       
+                                                       df_comb_list <- list(filing_text_parse_clean_trim2)
+                                                       
+                                                       rm(filing_no_text2,filing_text_parse_clean_trim2)
+                                                       rm(file,filepath,file_out,filepath_out)
+                                                       
+                                                       return(df_comb_list)
+                                                       
+                                                     },
+                                                     sub_folder_output_path=sub_folder_output_path,
+                                                     .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
                                
                                
+                               output_files_comb0 <- sapply(output_files, "[", 1)
+                               #output_files_comb1 <- do.call(rbind,output_files_comb0)
+                               output_files_comb1 <- rbindlist(output_files_comb0,fill=TRUE,use.names=TRUE)
+                               output_files_comb  <- as.data.frame(output_files_comb1,stringsAsFactors=FALSE) 
+                               rm(output_files_comb0,output_files_comb1)
                                
+                               output_files_comb_final <- data.frame(yr=NA,output_files_comb,stringsAsFactors=FALSE) 
+                               output_files_comb_final[,"yr"] <- yr
+                               rm(output_files_comb)
                                
-                               #Only keep forms of interest
-                               text_expand_trim1 <- text_expand[(text_expand[,c("TYPE")] %in% filetype),]
+                               df_comb_list_all <- list(output_files_comb_final)
                                
-                               
-                               
-                               
-                               
-                               
-                               bad_files_comb0 <- sapply(trim_headings, "[", 1)
-                               bad_files_comb1 <- do.call(rbind,bad_files_comb0)
-                               bad_files_comb  <- as.data.frame(bad_files_comb1,stringsAsFactors=FALSE)
-                               colnames(bad_files_comb) <- c("filepath","trash")
-                               row.names(bad_files_comb) <- seq(nrow(bad_files_comb))
-                               rm(bad_files_comb0,bad_files_comb1)
-                               
-                               header_intro_comb <- create_comb_df(list=trim_headings,list_pos=2,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_company_data_comb <- create_comb_df(list=trim_headings,list_pos=3,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_filing_values_comb <- create_comb_df(list=trim_headings,list_pos=4,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_business_address_comb <- create_comb_df(list=trim_headings,list_pos=5,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_mail_address_comb <- create_comb_df(list=trim_headings,list_pos=6,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               filer_former_company_comb <- create_comb_df(list=trim_headings,list_pos=7,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               series_other_comb <- create_comb_df(list=trim_headings,list_pos=8,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               series_class_contract_comb <- create_comb_df(list=trim_headings,list_pos=9,list_file_col="file",filing_info=filings_trim2_short,filing_info_file_col="file_header")
-                               
-                               rm(trim_headings)
-                               
-                               df_comb_list_all <- list(bad_files_comb,header_intro_comb,
-                                                        filer_company_data_comb,filer_filing_values_comb,filer_business_address_comb, filer_mail_address_comb,filer_former_company_comb,
-                                                        series_other_comb,series_class_contract_comb)
-                               
-                               rm(bad_files_comb,header_intro_comb)
-                               rm(filer_company_data_comb,filer_filing_values_comb,filer_business_address_comb,filer_mail_address_comb,filer_former_company_comb)
-                               rm(series_other_comb,series_class_contract_comb)
-                               rm(yr,yr_folder_path,sub_folder_path,downloaded_files3)
+                               rm(output_files_comb_final)
+                               rm(yr,yr_folder_path,sub_folder_path,sub_folder_output_path,downloaded_files3)
                                
                                return(df_comb_list_all)
                                
                              },
                              path_output=paste(output_directory,downloadfolder,sep=slash),
-                             subfolder=headerfolder,entity_encoding=entity_encoding,filetype=filetype,
+                             subfolder=txtfolder,subfolder_output=txtfolder_clean,
                              .progress = "text",.inform = TRUE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+
+
