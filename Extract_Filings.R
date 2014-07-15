@@ -94,124 +94,6 @@ cat("SECTION: FUNCTIONS", "\n")
 source(file=paste(function_directory,"functions_text_parse.R",sep="\\"),echo=FALSE)
 source(file=paste(function_directory,"functions_utilities.R",sep="\\"),echo=FALSE)
 
-clean_replacement_lookup <- function(file) {
-  
-  #  file <- contractions
-  
-  require(gdata)
-  
-  #Clean
-  letter_temp_clean <- file
-  
-  for(i in which(sapply(letter_temp_clean,class)=="character"))
-  {
-    letter_temp_clean[[i]] <- gsub(" {2,}", " ", letter_temp_clean[[i]])
-    letter_temp_clean[[i]] <- trim(letter_temp_clean[[i]])
-  }
-  rm(i)
-  
-  for (i in 1:ncol(letter_temp_clean))
-  {
-    letter_temp_clean[,i] <- unknownToNA(letter_temp_clean[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                          NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                          NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-    letter_temp_clean[,i] <- ifelse(is.na(letter_temp_clean[,i]),NA, letter_temp_clean[,i])
-  } 
-  rm(i)
-  
-  letter_temp1 <- data.frame(letter_temp_clean,stringsAsFactors=FALSE)
-  letter_temp1 <- letter_temp1[!is.na(letter_temp1[,"PATTERN"]),]
-  letter_temp1 <- letter_temp1[!(letter_temp1[,"PATTERN"]==""),]
-  letter_temp1 <- letter_temp1[!is.na(letter_temp1[,"REPLACEMENT"]),]
-  letter_temp1 <- letter_temp1[!(letter_temp1[,"REPLACEMENT"]==""),]
-  letter_temp1 <- letter_temp1[letter_temp1[,"INCLUDE"]=="YES",]
-  
-  letter_temp1[,"PATTERN"] <- gsub(" {2,}", " ", letter_temp1[,"PATTERN"])
-  letter_temp1[,"PATTERN"] <- gsub("^\\s+|\\s+$", "", letter_temp1[,"PATTERN"])
-  letter_temp1 <- letter_temp1[!(letter_temp1[,"PATTERN"]==""),]
-  
-  letter_temp1[,"REPLACEMENT"] <- gsub(" {2,}", " ", letter_temp1[,"REPLACEMENT"])
-  letter_temp1[,"REPLACEMENT"] <- gsub("^\\s+|\\s+$", "", letter_temp1[,"REPLACEMENT"])
-  letter_temp1 <- letter_temp1[!(letter_temp1[,"REPLACEMENT"]==""),]
-  
-  letter_temp1 <- unique(letter_temp1)
-  row.names(letter_temp1) <- seq(nrow(letter_temp1))
-  
-  letter_temp <- letter_temp1[,!(colnames(letter_temp1) %in% c("INCLUDE"))]
-  
-  rm(letter_temp1,letter_temp_clean)
-  
-  return(letter_temp)
-  
-}
-
-clean_strings <- function(file,str_col,backslash_flag,apostrophe_flag) {
-  
-  #  file <- letter_beginning
-  #  str_col <- "BEGINNINGS"
-  #  backslash_flag <- 1
-  #  apostrophe_flag <- 1
-  
-  require(gdata)
-  
-  #Clean
-  letter_temp_clean <- file
-  
-  for(i in which(sapply(letter_temp_clean,class)=="character"))
-  {
-    letter_temp_clean[[i]] <- gsub(" {2,}", " ", letter_temp_clean[[i]])
-    letter_temp_clean[[i]] <- trim(letter_temp_clean[[i]])
-  }
-  rm(i)
-  
-  for (i in 1:ncol(letter_temp_clean))
-  {
-    letter_temp_clean[,i] <- unknownToNA(letter_temp_clean[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                          NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                          NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-    letter_temp_clean[,i] <- ifelse(is.na(letter_temp_clean[,i]),NA, letter_temp_clean[,i])
-  } 
-  rm(i)
-  
-  letter_temp1 <- data.frame(letter_temp_clean,regex=NA,stringsAsFactors=FALSE)
-  letter_temp1 <- letter_temp1[!is.na(letter_temp1[,str_col]),]
-  letter_temp1 <- letter_temp1[!(letter_temp1[,str_col]==""),]
-  letter_temp1 <- letter_temp1[letter_temp1[,"INCLUDE"]=="YES",]
-  
-  letter_temp1[,"regex"] <- letter_temp1[,str_col]
-  
-  letter_temp1[,"regex"] <- gsub(",", " ", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- gsub(":", " ", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- gsub("--", "-", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- gsub(" -", "-", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- gsub("- ", "-", letter_temp1[,"regex"])
-  
-  if(backslash_flag) { letter_temp1[,"regex"] <- gsub("/", " ", letter_temp1[,"regex"]) }
-  if(apostrophe_flag) { letter_temp1[,"regex"] <- gsub("'", "", letter_temp1[,"regex"]) }
-  
-  letter_temp1[,"regex"] <- gsub("\\(", " ", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- gsub("\\)", " ", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- gsub("&", " AND ", letter_temp1[,"regex"])
-  
-  letter_temp1[,"regex"] <- gsub(" {2,}", " ", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- gsub("^\\s+|\\s+$", "", letter_temp1[,"regex"])
-  letter_temp1 <- letter_temp1[!(letter_temp1[,str_col]==""),]
-  
-  #letter_temp1[,"regex"] <- gsub(" ", ".*", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- gsub(" ", "\\\\s*", letter_temp1[,"regex"])
-  letter_temp1[,"regex"] <- ifelse(letter_temp1[,"PAD"]=="YES",paste(" ", letter_temp1[,"regex"], " ", sep=""), letter_temp1[,"regex"])
-  
-  letter_temp1 <- unique(letter_temp1)
-  row.names(letter_temp1) <- seq(nrow(letter_temp1))
-  
-  letter_temp <- letter_temp1[,!(colnames(letter_temp1) %in% c("PAD","INCLUDE"))]
-  
-  rm(letter_temp1,letter_temp_clean)
-  
-  return(letter_temp)
-  
-}
-
 regex_expand <- function(regex_stubs,strs,strs_col,priority_col,stub_beg_col,stub_end_col) {
   
   #  regex_stubs <- letter_beginning_regex0
@@ -475,102 +357,15 @@ rm(entity_encoding0,entity_encoding_clean)
 
 
 ###############################################################################
-cat("Import External Text Data \n")
+cat("Import Hash Table and Regex Strings \n")
 ###############################################################################
 
-#contractions0 <- read.csv(file=paste(input_directory,"Contractions.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-contractions0 <- read.table(file=paste(input_directory,"Contractions.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-#hyphenated_words0 <- read.table(file=paste(input_directory,"Hyphenated_Words.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-hyphenated_words0 <- read.table(file=paste(input_directory,"Hyphenated_Words_trim.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-shortened_words0 <- read.table(file=paste(input_directory,"Shortened_Words.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-
-#letter_beginning0 <- read.csv(file=paste(input_directory,"Letter_Beginning.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-letter_beginning0 <- read.table(file=paste(input_directory,"Letter_Beginning.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-letter_ending0 <- read.table(file=paste(input_directory,"Letter_Ending.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-letter_position0 <- read.table(file=paste(input_directory,"Letter_Position.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-letter_signature0 <- read.table(file=paste(input_directory,"Letter_Signature.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-letter_closing0 <- read.table(file=paste(input_directory,"Letter_Closing.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-
-
-###############################################################################
-cat("Substitute External Text Data \n")
-###############################################################################
-
-letter_beginning0[,c("BEGINNINGS")] <- paste(" ",letter_beginning0[,c("BEGINNINGS")]," ",sep="")
-letter_ending0[,c("ENDINGS")] <- paste(" ",letter_ending0[,c("ENDINGS")]," ",sep="")
-letter_position0[,c("POSITIONS")] <- paste(" ",letter_position0[,c("POSITIONS")]," ",sep="")
-letter_signature0[,c("SIGNATURES")] <- paste(" ",letter_signature0[,c("SIGNATURES")]," ",sep="")
-letter_closing0[,c("CLOSINGS")] <- paste(" ",letter_closing0[,c("CLOSINGS")]," ",sep="")
-
-letter_beginning0_dt <- data.table(letter_beginning0)
-letter_ending0_dt <- data.table(letter_ending0)
-letter_position0_dt <- data.table(letter_position0)
-letter_signature0_dt <- data.table(letter_signature0)
-letter_closing0_dt <- data.table(letter_closing0)
-
-rm(letter_beginning0,letter_ending0,letter_position0,letter_signature0,letter_closing0)
-
-cleaning_data <- c("contractions0","hyphenated_words0","shortened_words0")
-
-for(i in 1:length(cleaning_data))
-{
-  # i <- 1
-  # i <- 2
-  # i <- 3
-  
-  cleaning_data_temp <- get(cleaning_data[i])
-  
-  cat(cleaning_data[i],"\n")
-  
-  for(k in 1:nrow(cleaning_data_temp))
-  {
-    # k <- 1
-    
-    set(letter_beginning0_dt, i=NULL, j="BEGINNINGS", value=gsub(cleaning_data_temp[k,c("PATTERN")], cleaning_data_temp[k,c("REPLACEMENT")], letter_beginning0_dt[["BEGINNINGS"]], perl=TRUE))
-    set(letter_ending0_dt, i=NULL, j="ENDINGS", value=gsub(cleaning_data_temp[k,c("PATTERN")], cleaning_data_temp[k,c("REPLACEMENT")], letter_ending0_dt[["ENDINGS"]], perl=TRUE))
-    set(letter_position0_dt, i=NULL, j="POSITIONS", value=gsub(cleaning_data_temp[k,c("PATTERN")], cleaning_data_temp[k,c("REPLACEMENT")], letter_position0_dt[["POSITIONS"]], perl=TRUE))
-    set(letter_signature0_dt, i=NULL, j="SIGNATURES", value=gsub(cleaning_data_temp[k,c("PATTERN")], cleaning_data_temp[k,c("REPLACEMENT")], letter_signature0_dt[["SIGNATURES"]], perl=TRUE))
-    set(letter_closing0_dt, i=NULL, j="CLOSINGS", value=gsub(cleaning_data_temp[k,c("PATTERN")], cleaning_data_temp[k,c("REPLACEMENT")], letter_closing0_dt[["CLOSINGS"]], perl=TRUE))
-    
-    #letter_beginning0[,c("BEGINNINGS")] <- gsub(cleaning_data_temp[j,c("PATTERN")], cleaning_data_temp[j,c("REPLACEMENT")], letter_beginning0[,c("BEGINNINGS")],ignore.case = TRUE)
-    #letter_ending0[,c("ENDINGS")] <- gsub(cleaning_data_temp[j,c("PATTERN")], cleaning_data_temp[j,c("REPLACEMENT")], letter_ending0[,c("ENDINGS")],ignore.case = TRUE) 
-    #letter_position0[,c("POSITIONS")] <- gsub(cleaning_data_temp[j,c("PATTERN")], cleaning_data_temp[j,c("REPLACEMENT")], letter_position0[,c("POSITIONS")],ignore.case = TRUE)
-    #letter_signature0[,c("SIGNATURES")] <- gsub(cleaning_data_temp[j,c("PATTERN")], cleaning_data_temp[j,c("REPLACEMENT")], letter_signature0[,c("SIGNATURES")],ignore.case = TRUE)
-    #letter_closing0[,c("CLOSINGS")] <- gsub(cleaning_data_temp[j,c("PATTERN")], cleaning_data_temp[j,c("REPLACEMENT")], letter_closing0[,c("CLOSINGS")],ignore.case = TRUE)
-    
-  }
-  rm(cleaning_data_temp,k)
-  
-}
-rm(cleaning_data,i)
-
-# CLOSING - 624
-
-letter_beginning1 <- as.data.frame(letter_beginning0_dt,stringsAsFactors=FALSE)
-letter_ending1 <- as.data.frame(letter_ending0_dt,stringsAsFactors=FALSE)
-letter_position1 <- as.data.frame(letter_position0_dt,stringsAsFactors=FALSE)
-letter_signature1 <- as.data.frame(letter_signature0_dt,stringsAsFactors=FALSE)
-letter_closing1 <- as.data.frame(letter_closing0_dt,stringsAsFactors=FALSE)
-
-rm(letter_beginning0_dt,letter_ending0_dt,letter_position0_dt,letter_signature0_dt,letter_closing0_dt)
-
-
-###############################################################################
-cat("Clean External Text Data \n")
-###############################################################################
-
-contractions <- clean_replacement_lookup(file=contractions0)
-hyphenated_words <- clean_replacement_lookup(file=hyphenated_words0)
-shortened_words <- clean_replacement_lookup(file=shortened_words0)
-
-letter_beginning <- clean_strings(file=letter_beginning1,str_col="BEGINNINGS",backslash_flag=1,apostrophe_flag=1)
-letter_ending <- clean_strings(file=letter_ending1,str_col="ENDINGS",backslash_flag=1,apostrophe_flag=1)
-letter_position <- clean_strings(file=letter_position1,str_col="POSITIONS",backslash_flag=1,apostrophe_flag=1)
-letter_signature <- clean_strings(file=letter_signature1,str_col="SIGNATURES",backslash_flag=0,apostrophe_flag=1)
-letter_closing<- clean_strings(file=letter_closing1,str_col="CLOSINGS",backslash_flag=0,apostrophe_flag=1)
-
-rm(contractions0,hyphenated_words0,shortened_words0)
-rm(letter_beginning1,letter_ending1,letter_position1,letter_signature1,letter_closing1)
+hash_table <- read.table(file=paste(input_directory,"\\","hash_table_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_beginning <- read.table(file=paste(input_directory,"\\","letter_beginning_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_ending <- read.table(file=paste(input_directory,"\\","letter_ending_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_position <- read.table(file=paste(input_directory,"\\","letter_position_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_signature <- read.table(file=paste(input_directory,"\\","letter_signature_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_closing <- read.table(file=paste(input_directory,"\\","letter_closing_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 
 
 ###############################################################################
@@ -578,7 +373,7 @@ cat("Find Letters \n")
 ###############################################################################
 
 letters_all <- dlply(.data=filings_trim2, .variables=c("yr"), 
-                     .fun = function(x, path_output,subfolder,entity_encoding,contractions,hyphenated_words,shortened_words,letter_beginning,letter_ending,letter_position,letter_signature,letter_closing){
+                     .fun = function(x, path_output,subfolder,entity_encoding,hash_table,letter_beginning,letter_ending,letter_position,letter_signature,letter_closing){
                        
                        #  x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
                        #  x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
@@ -596,9 +391,7 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                        #  subfolder_output <- txtfolder_section
                        
                        #  entity_encoding <- entity_encoding
-                       #  contractions <- contractions
-                       #  hyphenated_words <- hyphenated_words
-                       #  shortened_words <- shortened_words
+                       #  hash_table <- hash_table
                        #  letter_beginning <- letter_beginning
                        #  letter_ending <- letter_ending
                        #  letter_position <- letter_position
@@ -643,7 +436,7 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                        rm(downloaded_files2)
                        
                        letters <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                        .fun = function(y,entity_encoding,contractions,hyphenated_words,shortened_words,letter_beginning,letter_ending,letter_position,letter_signature,letter_closing){
+                                        .fun = function(y,entity_encoding,hash_table,letter_beginning,letter_ending,letter_position,letter_signature,letter_closing){
                                           
                                           
                                           #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.csv"),]
@@ -657,9 +450,7 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-04-025975.csv"),]
                                           
                                           #  entity_encoding <- entity_encoding
-                                          #  contractions <- contractions
-                                          #  hyphenated_words <- hyphenated_words
-                                          #  shortened_words <- shortened_words
+                                          #  hash_table <- hash_table
                                           #  letter_beginning <- letter_beginning
                                           #  letter_ending <- letter_ending
                                           #  letter_position <- letter_position
@@ -784,16 +575,24 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           
                                           #CREATE CLEAN DATA
                                           filing_text_letter0_temp <- data.frame(filing_text_collapse,text_id=NA,text_trim=NA,letter_beginning=NA,letter_ending=NA,letter_signature=NA,letter_position=NA,
-                                                                            beg_cum_sum=NA,end_cum_sum=NA,stringsAsFactors=FALSE)
+                                                                                 beg_cum_sum=NA,end_cum_sum=NA,stringsAsFactors=FALSE)
                                           colnames(filing_text_letter0_temp)[match("text_trim",names(filing_text_letter0_temp))] <- xmltrim_col
                                           #colnames(filing_text_letter0_temp)[match("index_temp_overall",names(filing_text_letter0_temp))] <- "LETTER_INDEX"
                                           
                                           filing_text_id_cols <- c("file","DOCUMENT_INDEX","text_id",xmlcol,xmltrim_col)
                                           filing_text_letter0_temp <- filing_text_letter0_temp[,c(filing_text_id_cols,
-                                                                                        colnames(filing_text_letter0_temp[,!(colnames(filing_text_letter0_temp) %in% filing_text_id_cols)]))]
+                                                                                                  colnames(filing_text_letter0_temp[,!(colnames(filing_text_letter0_temp) %in% filing_text_id_cols)]))]
                                           
                                           filing_text_letter0_temp[,c("text_id")] <-  seq(1,nrow(filing_text_letter0_temp),1)
                                           filing_text_letter0_temp[,c(xmltrim_col)] <-  filing_text_letter0_temp[,c(xmlcol)] 
+                                          
+                                          
+                                          ####FIND ALL PUNCTUATION WORDS
+                                          
+                                          
+                                          
+                                          ####NEED TO TO REMOVE ALL PUNCTUATION! WHAT ABOUT HYPHEN????
+                                          
                                           
                                           
                                           
@@ -804,67 +603,39 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           
                                           rm(filing_text_letter0_temp)
                                           
-                                          cleaning_data <- c("contractions","hyphenated_words","shortened_words")
-                                          
-                                          for(i in 1:length(cleaning_data))
-                                          {
-                                            # i <- 1
-                                            # i <- 2
-                                            # i <- 3
                                             
-                                            cleaning_data_temp <- get(cleaning_data[i])
-                                            
-                                            #cat(cleaning_data[i],"\n")
-                                            
-                                            for(k in 1:nrow(cleaning_data_temp))
+                                            for(k in 1:nrow(hash_table))
                                             {
                                               # k <- 1
                                               
                                               set(filing_text_letter0_temp_dt, i=NULL, j=xmltrim_col, value=gsub(cleaning_data_temp[k,c("PATTERN")], cleaning_data_temp[k,c("REPLACEMENT")], filing_text_letter0_temp_dt[[xmltrim_col]], perl=TRUE))
                                               
                                             }
-                                            rm(cleaning_data_temp,k)
-                                            
-                                          }
-                                          rm(cleaning_data,i)
+                                            rm(hash_table,k)
+
                                           
                                           filing_text_letter0 <- as.data.frame(filing_text_letter0_temp_dt,stringsAsFactors=FALSE)
                                           
                                           rm(filing_text_letter0_temp_dt)
                                           
-
+                                          
                                           #CLEAN FILINGS
                                           
                                           filing_text_letter0[,c(xmltrim_col)] <- gsub(" {2,}", " ",filing_text_letter0[,c(xmltrim_col)])
                                           filing_text_letter0[,c(xmltrim_col)] <- gsub("^\\s+|\\s+$", "", filing_text_letter0[,c(xmltrim_col)])
                                           
+                                          
+                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("'", "", filing_text_letter0[,c(xmltrim_col)])
+                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("-", "", filing_text_letter0[,c(xmltrim_col)])
+                                          
+                                          filing_text_letter0[,c(xmltrim_col)] <- gsub(",", " ", filing_text_letter0[,c(xmltrim_col)])
+                                          filing_text_letter0[,c(xmltrim_col)] <- gsub(":", " ", filing_text_letter0[,c(xmltrim_col)])
+                                          
                                           #filing_text_letter0[,c(xmltrim_col)] <- gsub("'", "", filing_text_letter0[,c(xmltrim_col)])
                                           #filing_text_letter0[,c(xmltrim_col)] <- gsub(",", "", filing_text_letter0[,c(xmltrim_col)])
                                           #filing_text_letter0[,c(xmltrim_col)] <- gsub(":", "", filing_text_letter0[,c(xmltrim_col)])
+                                          
                                           filing_text_letter0[,c(xmltrim_col)] <- gsub("&", " AND ", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("--", "-", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub(" -", "-", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("- ", "-", filing_text_letter0[,c(xmltrim_col)])
-                                          
-                                          favourite favorite
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("ANY TIME", "ANYTIME", filing_text_letter0[,c(xmltrim_col)])     
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("ANY-TIME", "ANYTIME", filing_text_letter0[,c(xmltrim_col)])     
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("LONG TERM", "LONGTERM", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("LONG-TERM", "LONGTERM", filing_text_letter0[,c(xmltrim_col)])
-                                          
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("YOUR'S", "YOURS", filing_text_letter0[,c(xmltrim_col)])     
-                                          
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("CO OWNER", "COOWNER", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("CO-OWNER", "COOWNER", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("DEPUTY PRESIDENT", "DEPUTY-PRESIDENT", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("NON EXECUTIVE", "NON-EXECUTIVE", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("SECRETARY TREASURER", "SECRETARY-TREASURER", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("SOLE PROPRIETOR", "SOLE-PROPRIETOR", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("VICE CHAIR", "VICE-CHAIR", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("VICE CHAIRMAN", "VICE-CHAIRMAN", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("VICE PRESIDENT", "VICE-PRESIDENT", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("FULL TIME", "FULL-TIME", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("SUB ADVISOR", "SUB-ADVISOR", filing_text_letter0[,c(xmltrim_col)])
                                           filing_text_letter0[,c(xmltrim_col)] <- gsub("\\(S\\)", "S", filing_text_letter0[,c(xmltrim_col)])
                                           
                                           filing_text_letter0[,c(xmltrim_col)] <- gsub(" {2,}", " ",filing_text_letter0[,c(xmltrim_col)])
@@ -1355,7 +1126,7 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           return(df_comb_list)
                                           
                                         },
-                                        entity_encoding=entity_encoding, contractions=contractions,hyphenated_words=hyphenated_words,shortened_words=shortened_words,
+                                        entity_encoding=entity_encoding, hash_table=hash_table,
                                         letter_beginning=letter_beginning, letter_ending=letter_ending,letter_position=letter_position,letter_signature=letter_signature,letter_closing=letter_closing,
                                         .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
                        
@@ -1407,8 +1178,8 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                        
                      },
                      path_output=paste(output_directory,downloadfolder,sep=slash),
-                     subfolder=txtfolder_clean,entity_encoding=entity_encoding, letter_contractions=letter_contractions,
-                     letter_beginning=letter_beginning,letter_ending=letter_ending,letter_position=letter_position,letter_signature=letter_signature,
+                     subfolder=txtfolder_clean,entity_encoding=entity_encoding, hash_table=hash_table,
+                     letter_beginning=letter_beginning,letter_ending=letter_ending,letter_position=letter_position,letter_signature=letter_signature,letter_closing=letter_closing,
                      .progress = "text",.inform = TRUE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
 
 
