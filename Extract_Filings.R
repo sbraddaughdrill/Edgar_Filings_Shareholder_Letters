@@ -252,11 +252,11 @@ endqtr <- 4
 #downloadfolder <- "MF_Shareholder_Reports_N-CSRS"
 downloadfolder <- "MF_Shareholder_Reports_N-CSRS-A"
 
-#The sub directory where the downloaded filings are
-txtfolder_clean <- "txt_clean"
+#The sub directory where input filings are
+txtfolder_in <- "txt_substitute"
 
-#The sub directory where the combined filings will be located
-txtfolder_section <- "letter"
+#The sub directory where the output filings will go
+txtfolder_out <- "letter"
 
 #The file that will contain the filings you want to download.
 infile <- "filings_list_comb.csv"
@@ -320,47 +320,9 @@ rm(filings_trim)
 
 
 ###############################################################################
-cat("Import HTML entities \n")
+cat("Import Regex Strings \n")
 ###############################################################################
 
-#entity_encoding0 <- read.csv(file=paste(input_directory,"Entity_encoding.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-entity_encoding0 <- read.table(file=paste(input_directory,"Entity_encoding.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
-                               sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-
-#Clean
-entity_encoding_clean <- entity_encoding0
-#for(i in 1:ncol(entity_encoding_clean))
-#{
-#  entity_encoding_clean[,i] <- iconv(entity_encoding_clean[,i], "latin1", "ASCII", sub="")
-#}
-
-for(i in which(sapply(entity_encoding_clean,class)=="character"))
-{
-  entity_encoding_clean[[i]] = trim(entity_encoding_clean[[i]])
-}
-rm(i)
-
-for (i in 1:ncol(entity_encoding_clean))
-{
-  entity_encoding_clean[,i] <- unknownToNA(entity_encoding_clean[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                                NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                                NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-  entity_encoding_clean[,i] <- ifelse(is.na(entity_encoding_clean[,i]),NA, entity_encoding_clean[,i])
-} 
-rm(i)
-
-entity_encoding <- entity_encoding_clean[(!(is.na(entity_encoding_clean[,"ASCII.Looks.Like"])) & 
-                                            !(is.na(entity_encoding_clean[,"Entity.Encoding"]))),]
-row.names(entity_encoding) <- seq(nrow(entity_encoding))
-
-rm(entity_encoding0,entity_encoding_clean)
-
-
-###############################################################################
-cat("Import Hash Table and Regex Strings \n")
-###############################################################################
-
-hash_table <- read.table(file=paste(input_directory,"\\","hash_table_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 letter_beginning <- read.table(file=paste(input_directory,"\\","letter_beginning_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 letter_ending <- read.table(file=paste(input_directory,"\\","letter_ending_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 letter_position <- read.table(file=paste(input_directory,"\\","letter_position_final",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
@@ -373,7 +335,7 @@ cat("Find Letters \n")
 ###############################################################################
 
 letters_all <- dlply(.data=filings_trim2, .variables=c("yr"), 
-                     .fun = function(x, path_output,subfolder,entity_encoding,hash_table,letter_beginning,letter_ending,letter_position,letter_signature,letter_closing){
+                     .fun = function(x, path_output,subfolder,letter_beginning,letter_ending,letter_position,letter_signature,letter_closing){
                        
                        #  x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
                        #  x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
@@ -387,18 +349,15 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                        #  x <- filings_trim2[(filings_trim2[,"yr"]==2012),]
                        #  x <- filings_trim2[(filings_trim2[,"yr"]==2013),]
                        #  path_output <- paste(output_directory,downloadfolder,sep=slash)
-                       #  subfolder <- txtfolder_clean
-                       #  subfolder_output <- txtfolder_section
+                       #  subfolder <- txtfolder_in
+                       #  subfolder_output <- txtfolder_out
                        
-                       #  entity_encoding <- entity_encoding
-                       #  hash_table <- hash_table
                        #  letter_beginning <- letter_beginning
                        #  letter_ending <- letter_ending
                        #  letter_position <- letter_position
                        #  letter_signature <- letter_signature
                        #  letter_closing <- letter_closing
-                       
-                       
+                        
                        filings_trim2_short <- x[,!(colnames(x) %in% c("file_header","file_index_htm"))]
                        
                        yr <-  unique(x[,"yr"])
@@ -427,7 +386,8 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                        
                        rm(downloaded_files)
                        
-                       downloaded_files2 <- downloaded_files2[order(downloaded_files2[,"filepath"]),]
+                       #downloaded_files2 <- downloaded_files2[order(downloaded_files2[,"filepath"]),]
+                       downloaded_files2 <- downloaded_files2[order(-downloaded_files2[,"size"]),]
                        row.names(downloaded_files2) <- seq(nrow(downloaded_files2))
                        
                        downloaded_files3 <- data.frame(yr_id=NA,downloaded_files2,stringsAsFactors=FALSE)
@@ -436,7 +396,7 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                        rm(downloaded_files2)
                        
                        letters <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                        .fun = function(y,entity_encoding,hash_table,letter_beginning,letter_ending,letter_position,letter_signature,letter_closing){
+                                        .fun = function(y,letter_beginning,letter_ending,letter_position,letter_signature,letter_closing){
                                           
                                           
                                           #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.csv"),]
@@ -446,11 +406,12 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000949377-03-000778.csv"),]
                                           #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000950136-03-003115.csv"),]
                                           #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0001017062-03-000375.csv"),]
-                                          #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000811860-04-000012.csv"),]
+                                          
+                                          #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000930413-04-002211.csv"),]
+                                          
+                                          #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000950129-04-005427.csv"),]
                                           #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-04-025975.csv"),]
                                           
-                                          #  entity_encoding <- entity_encoding
-                                          #  hash_table <- hash_table
                                           #  letter_beginning <- letter_beginning
                                           #  letter_ending <- letter_ending
                                           #  letter_position <- letter_position
@@ -471,14 +432,14 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           filing <- read.table(file=filepath, header = TRUE, na.strings="",stringsAsFactors=FALSE, 
                                                                sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
                                           
-                                          filing_no_text0 <- filing[,!(colnames(filing) %in% c(xmlcol))]
+                                          filing_no_text0 <- filing[,!(colnames(filing) %in% c("text_id",xmlcol,xmltrim_col))]
                                           filing_no_text1 <- unique(filing_no_text0)
                                           #filing_no_text2 <- data.frame(file=NA,filing_no_text1,stringsAsFactors=FALSE)
                                           #filing_no_text2[,"file"] <- file
                                           filing_no_text2 <- filing_no_text1
                                           rm(filing_no_text0,filing_no_text1)
                                           
-                                          filing_text0 <- filing[,(colnames(filing) %in% c("DOCUMENT_INDEX",xmlcol))]
+                                          filing_text0 <- filing[,(colnames(filing) %in% c("DOCUMENT_INDEX","text_id",xmlcol,xmltrim_col))]
                                           filing_text1 <- data.frame(file=NA,filing_text0,stringsAsFactors=FALSE)
                                           filing_text1[,"file"] <- file
                                           rm(filing_text0)
@@ -486,17 +447,9 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           rm(filing)
                                           
                                           
-                                          
                                           #Clean Tags
                                           filing_text_clean <- filing_text1
                                           rm(filing_text1)
-                                          
-                                          #for(i in which(sapply(filing_text_clean,class)=="character"))
-                                          #  {
-                                          #    #filing_text_clean[[i]] <- gsub(" {2,}", " ", filing_text_clean[[i]])
-                                          #   filing_text_clean[[i]] <- trim(filing_text_clean[[i]])
-                                          #  }
-                                          # rm(i)
                                           
                                           for (i in 1:ncol(filing_text_clean))
                                           {
@@ -508,143 +461,69 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           rm(i)
                                           
                                           
-                                          #ENTITY DECODING
-                                          #&AMP; -> &
-                                          entity_encoding_trim <- entity_encoding
-                                          entity_encoding_trim_amp <- entity_encoding_trim[(entity_encoding_trim[,"ASCII.Looks.Like"] %in% c("&")),]
-                                          entity_encoding_trim_no_amp <-  entity_encoding_trim[!(entity_encoding_trim[,"ASCII.Looks.Like"] %in% c("&")),]
-                                          rm(entity_encoding_trim)
-                                          
-                                          filing_text_decode <- filing_text_clean
-                                          rm(filing_text_clean)
-                                          
-                                          col_val_decoded <- c(xmlcol)
-                                          for (i in 1:length(col_val_decoded))
-                                          {
-                                            col_temp <- col_val_decoded[i]
-                                            
-                                            for (j in 1:nrow(entity_encoding_trim_amp))
-                                            {
-                                              pattern_temp1 <- entity_encoding_trim_amp[j,"Entity.Encoding"]
-                                              replacement_temp1 <- entity_encoding_trim_amp[j,"ASCII.Looks.Like"]
-                                              filing_text_decode[,col_temp] <- gsub(pattern_temp1, replacement_temp1, filing_text_decode[,col_temp],ignore.case = TRUE)
-                                              rm(pattern_temp1,replacement_temp1)
-                                            } 
-                                            rm(j)
-                                            
-                                            for (k in 1:nrow(entity_encoding_trim_no_amp))
-                                            {
-                                              pattern_temp1 <- entity_encoding_trim_no_amp[k,"Entity.Encoding"]
-                                              replacement_temp1 <- entity_encoding_trim_no_amp[k,"ASCII.Looks.Like"]
-                                              filing_text_decode[,col_temp] <- gsub(pattern_temp1, replacement_temp1, filing_text_decode[,col_temp],ignore.case = TRUE)
-                                              rm(pattern_temp1,replacement_temp1)
-                                            } 
-                                            rm(col_temp,k)
-                                            
-                                          } 
-                                          rm(entity_encoding_trim_amp,entity_encoding_trim_no_amp,col_val_decoded,i)
-                                          
-                                          filing_text_sub <- filing_text_decode
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("'", "", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub(",", "", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub(":", "", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("&", " AND ", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("--", "-", filing_text_sub[xmlcol,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub(" -", "-", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("- ", "-", filing_text_sub[,c(xmlcol)])
-                                          
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("CO OWNER", "COOWNER", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("CO-OWNER", "COOWNER", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("DEPUTY PRESIDENT", "DEPUTY-PRESIDENT", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("NON EXECUTIVE", "NON-EXECUTIVE", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("SECRETARY TREASURER", "SECRETARY-TREASURER", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("SOLE PROPRIETOR", "SOLE-PROPRIETOR", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("VICE CHAIR", "VICE-CHAIR", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("VICE CHAIRMAN", "VICE-CHAIRMAN", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("VICE PRESIDENT", "VICE-PRESIDENT", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("FULL TIME", "FULL-TIME", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("SUB ADVISOR", "SUB-ADVISOR", filing_text_sub[,c(xmlcol)])
-                                          #filing_text_sub[,c(xmlcol)] <- gsub("\\(S\\)", "S", filing_text_sub[,c(xmlcol)])
-                                          
-                                          rm(filing_text_decode)
-                                          
-                                          #COLLAPSE AT DOUBLE /N's
-                                          filing_text_collapse <- filing_text_sub
-                                          rm(filing_text_sub)
+                                          filing_text_clean[,c(xmltrim_col)] <- paste(" ", filing_text_clean[,c(xmltrim_col)]," ",sep="")
                                           
                                           
-                                          #CREATE CLEAN DATA
-                                          filing_text_letter0_temp <- data.frame(filing_text_collapse,text_id=NA,text_trim=NA,letter_beginning=NA,letter_ending=NA,letter_signature=NA,letter_position=NA,
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub(" {2,}", " ",filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("^\\s+|\\s+$", "", filing_text_clean[,c(xmltrim_col)])
+                                          
+                                          
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("'", "", filing_text_clean[,c(xmltrim_col)]) 
+                                          
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("&", " AND ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("\\(S\\)", "S", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("-INITIAL-", " -INITIAL- ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("-INITIALS-", " -INITIALS- ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("-S-", " -S- ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("-SIGNATURE-", " -SIGNATURE- ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("-SIGNATURES-", " -SIGNATURES- ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("-SIGNED-", " -SIGNED- ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("/INITIAL/", " /INITIAL/ ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("/INITIALS/", " /INITIALS/ ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("/S/", " /S/ ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("/SIGNATURE/", " /SIGNATURE/ ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("/SIGNATURES/", " /SIGNATURES/ ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("/SIGNED/", " /SIGNED/ ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("INITIALS:", " INITIALS: ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("SIGNATURE:", " SIGNATURE: ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("SIGNATURES:", " SIGNATURES: ", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("SIGNED:", " SIGNED: ", filing_text_clean[,c(xmltrim_col)])
+                                          
+                                          #Pad punctuation
+                                          
+                                          hash_pattern <- "([*=/.,:;!?()])"
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub(hash_pattern," \\1 ",filing_text_clean[,c(xmltrim_col)])
+                                          #filing_text_clean[,c(xmltrim_col)] <- gsub("([[:punct:]])"," \\1 ",filing_text_clean[,c(xmltrim_col)])
+                                          
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("--", "-", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub(" -", "-", filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("- ", "-", filing_text_clean[,c(xmltrim_col)])
+                                          #filing_text_clean[,c(xmltrim_col)] <- gsub("-", "", filing_text_clean[,c(xmltrim_col)])
+                                          
+                                          #filing_text_clean[,c(xmltrim_col)] <- gsub(",", "", filing_text_clean[,c(xmltrim_col)])
+                                          #filing_text_clean[,c(xmltrim_col)] <- gsub(",", " ", filing_text_clean[,c(xmltrim_col)])
+                                          
+                                          #filing_text_clean[,c(xmltrim_col)] <- gsub(":", "", filing_text_clean[,c(xmltrim_col)])
+                                          #filing_text_clean[,c(xmltrim_col)] <- gsub(":", " ", filing_text_clean[,c(xmltrim_col)])
+                                          
+                                          
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub(" {2,}", " ",filing_text_clean[,c(xmltrim_col)])
+                                          filing_text_clean[,c(xmltrim_col)] <- gsub("^\\s+|\\s+$", "", filing_text_clean[,c(xmltrim_col)])
+                                          
+                                          filing_text_clean[,c(xmltrim_col)] <- paste(" ", filing_text_clean[,c(xmltrim_col)]," ",sep="")
+                                          
+                                          
+                                          
+                                          #ADD FLAGS TO DATA
+                                          filing_text_letter0_temp <- data.frame(filing_text_clean,letter_beginning=NA,letter_ending=NA,letter_signature=NA,letter_position=NA,letter_closing=NA,
                                                                                  beg_cum_sum=NA,end_cum_sum=NA,stringsAsFactors=FALSE)
-                                          colnames(filing_text_letter0_temp)[match("text_trim",names(filing_text_letter0_temp))] <- xmltrim_col
-                                          #colnames(filing_text_letter0_temp)[match("index_temp_overall",names(filing_text_letter0_temp))] <- "LETTER_INDEX"
                                           
                                           filing_text_id_cols <- c("file","DOCUMENT_INDEX","text_id",xmlcol,xmltrim_col)
                                           filing_text_letter0_temp <- filing_text_letter0_temp[,c(filing_text_id_cols,
                                                                                                   colnames(filing_text_letter0_temp[,!(colnames(filing_text_letter0_temp) %in% filing_text_id_cols)]))]
                                           
-                                          filing_text_letter0_temp[,c("text_id")] <-  seq(1,nrow(filing_text_letter0_temp),1)
-                                          filing_text_letter0_temp[,c(xmltrim_col)] <-  filing_text_letter0_temp[,c(xmlcol)] 
                                           
-                                          
-                                          ####FIND ALL PUNCTUATION WORDS
-                                          
-                                          
-                                          
-                                          ####NEED TO TO REMOVE ALL PUNCTUATION! WHAT ABOUT HYPHEN????
-                                          
-                                          
-                                          
-                                          
-                                          #SUBSTITUTE
-                                          filing_text_letter0_temp[,c(xmltrim_col)] <- paste(" ",filing_text_letter0_temp[,c(xmltrim_col)]," ",sep="")
-                                          
-                                          filing_text_letter0_temp_dt <- data.table(filing_text_letter0_temp)
-                                          
-                                          rm(filing_text_letter0_temp)
-                                          
-                                            
-                                            for(k in 1:nrow(hash_table))
-                                            {
-                                              # k <- 1
-                                              
-                                              set(filing_text_letter0_temp_dt, i=NULL, j=xmltrim_col, value=gsub(cleaning_data_temp[k,c("PATTERN")], cleaning_data_temp[k,c("REPLACEMENT")], filing_text_letter0_temp_dt[[xmltrim_col]], perl=TRUE))
-                                              
-                                            }
-                                            rm(hash_table,k)
-
-                                          
-                                          filing_text_letter0 <- as.data.frame(filing_text_letter0_temp_dt,stringsAsFactors=FALSE)
-                                          
-                                          rm(filing_text_letter0_temp_dt)
-                                          
-                                          
-                                          #CLEAN FILINGS
-                                          
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub(" {2,}", " ",filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("^\\s+|\\s+$", "", filing_text_letter0[,c(xmltrim_col)])
-                                          
-                                          
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("'", "", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("-", "", filing_text_letter0[,c(xmltrim_col)])
-                                          
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub(",", " ", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub(":", " ", filing_text_letter0[,c(xmltrim_col)])
-                                          
-                                          #filing_text_letter0[,c(xmltrim_col)] <- gsub("'", "", filing_text_letter0[,c(xmltrim_col)])
-                                          #filing_text_letter0[,c(xmltrim_col)] <- gsub(",", "", filing_text_letter0[,c(xmltrim_col)])
-                                          #filing_text_letter0[,c(xmltrim_col)] <- gsub(":", "", filing_text_letter0[,c(xmltrim_col)])
-                                          
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("&", " AND ", filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("\\(S\\)", "S", filing_text_letter0[,c(xmltrim_col)])
-                                          
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub(" {2,}", " ",filing_text_letter0[,c(xmltrim_col)])
-                                          filing_text_letter0[,c(xmltrim_col)] <- gsub("^\\s+|\\s+$", "", filing_text_letter0[,c(xmltrim_col)])
-                                          
-                                          filing_text_letter0[,c(xmltrim_col)] <- paste(" ", filing_text_letter0[,c(xmltrim_col)]," ",sep="")
-                                          
-                                          rm(filing_text_collapse)
-                                          
+                                          filing_text_letter0 <- filing_text_letter0_temp
                                           
                                           #FIND BEG MATCHES  
                                           letter_beginning_regex0a <- data.frame(REGEX_PRIORITY=1,beg_txt="^\\s+",end_txt="(S*)\\s*(,|:|-)\\s+$",stringsAsFactors=FALSE)
@@ -687,18 +566,32 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                             cat("NO BEGINNING MATCHES FOUND", "\n")
                                             
                                             #CREATE MATCH SUMMARIES
-                                            matches_summary0a <- data.frame(file=file,type="final_regex_priority",letter_beginning=i,letter_ending=NA,letter_signature=NA,letter_position=NA,stringsAsFactors=FALSE)
-                                            matches_summary0b <- data.frame(file=file,type="overall_matches",letter_beginning=nrow(filing_text_letter_matches_beg),letter_ending=NA,letter_signature=NA,letter_position=NA,stringsAsFactors=FALSE)
-                                            matches_summary0c <- data.frame(file=file,type="unique_matches",letter_beginning=length(unique(filing_text_letter_matches_beg[,c("text_id")])),letter_ending=NA,letter_signature=NA,letter_position=NA,stringsAsFactors=FALSE)
+                                            matches_summary0a <- data.frame(file=file,type="final_regex_priority",letter_beginning=i,letter_ending=NA,letter_signature=NA,letter_position=NA,letter_closing=NA,stringsAsFactors=FALSE)
+                                            matches_summary0b <- data.frame(file=file,type="overall_matches",letter_beginning=nrow(filing_text_letter_matches_beg),letter_ending=NA,letter_signature=NA,letter_position=NA,letter_closing=NA,stringsAsFactors=FALSE)
+                                            matches_summary0c <- data.frame(file=file,type="unique_matches",letter_beginning=length(unique(filing_text_letter_matches_beg[,c("text_id")])),letter_ending=NA,letter_signature=NA,letter_position=NA,letter_closing=NA,stringsAsFactors=FALSE)
                                             filing_text_letter_matches_summary <- rbindlist(list(matches_summary0a,matches_summary0b,matches_summary0c))
-                                            rm(matches_summary0a,matches_summary0b,matches_summary0c,i)
+                                            rm(matches_summary0a,matches_summary0b,matches_summary0c)
+                                            rm(i)
+                                            
+                                            filing_text_letter_matches_end <- filing_text_letter_matches_beg
+                                            colnames(filing_text_letter_matches_end)[match("letter_beginning",names(filing_text_letter_matches_end))] <- "letter_ending"
+                                            
+                                            filing_text_letter_matches_sign  <- filing_text_letter_matches_beg
+                                            colnames(filing_text_letter_matches_sign)[match("letter_beginning",names(filing_text_letter_matches_sign))] <- "letter_signature"
+                                            
+                                            filing_text_letter_matches_pos <- filing_text_letter_matches_beg
+                                            colnames(filing_text_letter_matches_pos)[match("letter_beginning",names(filing_text_letter_matches_pos))] <- "letter_position"
+                                            
+                                            filing_text_letter_matches_close  <- filing_text_letter_matches_beg
+                                            colnames(filing_text_letter_matches_close)[match("letter_beginning",names(filing_text_letter_matches_close))] <- "letter_closing"
+                                            
+                                            filing_text_letter7 <- filing_text_letter1[1,]
+                                            filing_text_letter7[,"beg_cum_sum"] <- 0
+                                            filing_text_letter7[,xmlcol] <- NA
+                                            filing_text_letter7[,xmltrim_col] <- NA
                                             
                                             
-                                            # IF NOT BEGINNING MATCHES FOUND, EXIT THE ROUTINE AFTER CREATING MATCH SUMMARY AND EMPTY DF
-                                            # WE WON"T BE RUNNING THE END SEARCHES
-                                            
-                                            
-                                            #filing_text_letter6[,"beg_cum_sum"] <- 0
+                                            rm(filing_text_letter1)
                                             
                                             
                                             
@@ -749,9 +642,12 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                             
                                             
                                             #FIND SIGNATURE MATCHES
+                                            
+                                            ###ADD THE SLASHES AND DASHES HERE!!!!
+                                            
                                             letter_signature_regex0a <- data.frame(REGEX_PRIORITY=1,beg_txt="^\\s+",end_txt="\\s+$",stringsAsFactors=FALSE)
-                                            letter_signature_regex0c <- data.frame(REGEX_PRIORITY=2,beg_txt="^\\s+(?=(",end_txt="(\\s+)))",stringsAsFactors=FALSE)
-                                            letter_signature_regex0b <- data.frame(REGEX_PRIORITY=3,beg_txt="^\\s+",end_txt="\\s+.*$",stringsAsFactors=FALSE)
+                                            letter_signature_regex0b <- data.frame(REGEX_PRIORITY=2,beg_txt="^\\s+(?=(",end_txt="(\\s+)))",stringsAsFactors=FALSE)
+                                            letter_signature_regex0c <- data.frame(REGEX_PRIORITY=3,beg_txt="^\\s+",end_txt="\\s+.*$",stringsAsFactors=FALSE)
                                             letter_signature_regex0d <- data.frame(REGEX_PRIORITY=4,beg_txt="^.*\\s+(?=(",end_txt="(\\s+)))",stringsAsFactors=FALSE)
                                             letter_signature_regex0e <- data.frame(REGEX_PRIORITY=5,beg_txt=".*\\s+",end_txt="\\s+.*",stringsAsFactors=FALSE)
                                             letter_signature_regex0 <- rbindlist(list(letter_signature_regex0a,letter_signature_regex0b,letter_signature_regex0c,letter_signature_regex0d,letter_signature_regex0e))
@@ -813,6 +709,39 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                             invisible(gc(verbose = FALSE, reset = TRUE))
                                             
                                             
+                                            #FIND CLOSING MATCHES
+                                            letter_closing_regex0a <- data.frame(REGEX_PRIORITY=1,beg_txt="^\\s+",end_txt="(\\s*)(,|:|-)\\s+$",stringsAsFactors=FALSE)
+                                            letter_closing_regex0b <- data.frame(REGEX_PRIORITY=2,beg_txt="^\\s+",end_txt="\\s+$",stringsAsFactors=FALSE)
+                                            letter_closing_regex0c <- data.frame(REGEX_PRIORITY=3,beg_txt="^\\s+(?=(",end_txt="(\\s+)))",stringsAsFactors=FALSE)
+                                            letter_closing_regex0d <- data.frame(REGEX_PRIORITY=4,beg_txt="^.*\\s+(?=(",end_txt="(\\s+)))",stringsAsFactors=FALSE)
+                                            #letter_closing_regex0e <- data.frame(REGEX_PRIORITY=4,beg_txt="^.*\\s+(?=(",end_txt="(S*)(\\s+)))",stringsAsFactors=FALSE)
+                                            letter_closing_regex0 <- rbindlist(list(letter_closing_regex0a,letter_closing_regex0b,letter_closing_regex0c,letter_closing_regex0d))
+                                            letter_closing_regex <- regex_expand(regex_stubs=letter_closing_regex0,strs=letter_closing,
+                                                                                 strs_col="regex", priority_col="REGEX_PRIORITY",stub_beg_col="beg_txt",stub_end_col="end_txt")
+                                            rm(letter_closing_regex0a,letter_closing_regex0b,letter_closing_regex0c,letter_closing_regex0d)
+                                            
+                                            for (m in 1:nrow(letter_closing_regex0))
+                                            {
+                                              #  m <- 1
+                                              
+                                              #cat("REGEX PRIORITY:",m,"\n")
+                                              
+                                              regex_temp <- letter_closing_regex[letter_closing_regex[,"REGEX_PRIORITY"]==m,]
+                                              
+                                              filing_text_letter_id5 <- regex_section_matches_expand(regex_strs=regex_temp[,"regex"],data=filing_text_letter4, dv_col="letter_closing", txt_col=xmltrim_col)
+                                              filing_text_letter_matches_close <- filing_text_letter_id5[!is.na(filing_text_letter_id5[,"letter_closing"]),]
+                                              filing_text_letter_matches_close <- filing_text_letter_matches_close[,(colnames(filing_text_letter_matches_close) %in% c(filing_text_id_cols,"letter_closing"))]
+                                              filing_text_letter5 <- regex_section_matches_collapse(matches_expand=filing_text_letter_id5, dv_col="letter_closing", txtid_col="text_id")
+                                              
+                                              rm(regex_temp,filing_text_letter_id5)
+                                              
+                                              if (nrow(filing_text_letter_matches_close)!=0) { filing_text_letter_matches_close <- data.frame(filing_text_letter_matches_close,regex_priority=l,stringsAsFactors=FALSE); break }
+                                              if (m!=nrow(letter_closing_regex0)) { rm(filing_text_letter_matches_close,filing_text_letter5) }
+                                            }
+                                            rm(letter_closing_regex0,letter_closing_regex,filing_text_letter4)
+                                            invisible(gc(verbose = FALSE, reset = TRUE))
+                                            
+                                            
                                             #CREATE MATCH SUMMARIES
                                             #matches_summary0a <- data.frame(file=file,type="letter_beginning",final_regex_priority=i,overall_matches=nrow(filing_text_letter_matches_beg),unique_matches=length(unique(filing_text_letter_matches_beg[,c("text_id")])),stringsAsFactors=FALSE)
                                             #matches_summary0b <- data.frame(file=file,type="letter_ending",final_regex_priority=j,overall_matches=nrow(filing_text_letter_matches_end),unique_matches=length(unique(filing_text_letter_matches_end[,c("text_id")])),stringsAsFactors=FALSE)
@@ -821,19 +750,30 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                             #filing_text_letter_matches_summary_old <- rbindlist(list(matches_summary0a,matches_summary0b,matches_summary0c,matches_summary0d))
                                             #rm(matches_summary0a,matches_summary0b,matches_summary0c,matches_summary0d,i,j,k,l)
                                             
-                                            matches_summary0a <- data.frame(file=file,type="final_regex_priority",letter_beginning=i,letter_ending=j,letter_signature=k,letter_position=l,stringsAsFactors=FALSE)
-                                            matches_summary0b <- data.frame(file=file,type="overall_matches",letter_beginning=nrow(filing_text_letter_matches_beg),letter_ending=nrow(filing_text_letter_matches_end),
-                                                                            letter_signature=nrow(filing_text_letter_matches_sign),letter_position=nrow(filing_text_letter_matches_pos),stringsAsFactors=FALSE)
-                                            matches_summary0c <- data.frame(file=file,type="unique_matches",letter_beginning=length(unique(filing_text_letter_matches_beg[,c("text_id")])),letter_ending=length(unique(filing_text_letter_matches_end[,c("text_id")])),
-                                                                            letter_signature=length(unique(filing_text_letter_matches_sign[,c("text_id")])),letter_position=length(unique(filing_text_letter_matches_pos[,c("text_id")])),stringsAsFactors=FALSE)
+                                            matches_summary0a <- data.frame(file=file,type="final_regex_priority",letter_beginning=i,letter_ending=j,letter_signature=k,letter_position=l,letter_closing=m,stringsAsFactors=FALSE)
+                                            matches_summary0b <- data.frame(file=file,type="overall_matches",
+                                                                            letter_beginning=nrow(filing_text_letter_matches_beg),
+                                                                            letter_ending=nrow(filing_text_letter_matches_end),
+                                                                            letter_signature=nrow(filing_text_letter_matches_sign),
+                                                                            letter_position=nrow(filing_text_letter_matches_pos),
+                                                                            letter_closing=nrow(filing_text_letter_matches_close),
+                                                                            stringsAsFactors=FALSE)
+                                            matches_summary0c <- data.frame(file=file,type="unique_matches",
+                                                                            letter_beginning=length(unique(filing_text_letter_matches_beg[,c("text_id")])),
+                                                                            letter_ending=length(unique(filing_text_letter_matches_end[,c("text_id")])),
+                                                                            letter_signature=length(unique(filing_text_letter_matches_sign[,c("text_id")])),
+                                                                            letter_position=length(unique(filing_text_letter_matches_pos[,c("text_id")])),
+                                                                            letter_closing=length(unique(filing_text_letter_matches_close[,c("text_id")])),
+                                                                            stringsAsFactors=FALSE)
                                             filing_text_letter_matches_summary <- rbindlist(list(matches_summary0a,matches_summary0b,matches_summary0c))
-                                            rm(matches_summary0a,matches_summary0b,matches_summary0c,i,j,k,l)
+                                            rm(matches_summary0a,matches_summary0b,matches_summary0c)
+                                            rm(i,j,k,l,m)
                                             
                                             
                                             #REMOVE TEXT BEFORE LETTER
-                                            filing_text_letter5 <- ddply(.data=filing_text_letter4, .variables=c("file","DOCUMENT_INDEX"), .fun = function(x){
+                                            filing_text_letter6 <- ddply(.data=filing_text_letter5, .variables=c("file","DOCUMENT_INDEX"), .fun = function(x){
                                               
-                                              #  x <- filing_text_letter4[(filing_text_letter4[,"DOCUMENT_INDEX"]==1),]
+                                              #  x <- filing_text_letter5[(filing_text_letter5[,"DOCUMENT_INDEX"]==1),]
                                               
                                               x[,"beg_cum_sum"] <- cumsum(x[,"letter_beginning"])
                                               x_trim <- x[!(x[,"beg_cum_sum"]==0),]
@@ -846,27 +786,24 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                               
                                               return(x_trim)
                                             })
-                                            rm(filing_text_letter4)
+                                            rm(filing_text_letter5)
                                             
                                             
                                             #REMOVE TEXT AFTER LETTER
                                             
-                                            #filing_text_letter5_empty_cols <- as.data.frame(t(!colSums(is.na(filing_text_letter5))<nrow(filing_text_letter5)),stringsAsFactors=FALSE)
+                                            #filing_text_letter6_empty_cols <- as.data.frame(t(!colSums(is.na(filing_text_letter6))<nrow(filing_text_letter6)),stringsAsFactors=FALSE)
                                             
-                                            #if (filing_text_letter5_empty_cols[,"beg_cum_sum"]) {
+                                            #if (filing_text_letter6_empty_cols[,"beg_cum_sum"]) {
                                             
                                             
                                             #  cat("NO BEGINNING MATCHES FOUND", "\n")
                                             
-                                            #  filing_text_letter6 <- filing_text_letter5
-                                            #  filing_text_letter6[,"beg_cum_sum"] <- 0
+                                            #  filing_text_letter7 <- filing_text_letter6
+                                            #  filing_text_letter7[,"beg_cum_sum"] <- 0
                                             
                                             #} else {
                                             
                                             #cat("BEGINNING MATCHES FOUND", "\n")
-                                            
-                                            
-                                            
                                             
                                             
                                             #  THE CRITERIA NEEDS TO BE NOT IF END !=0.
@@ -875,10 +812,11 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                             
                                             
                                             
-                                            filing_text_letter6 <- ddply(.data=filing_text_letter5, .variables=c("file","DOCUMENT_INDEX","beg_cum_sum"), 
+                                            filing_text_letter7 <- ddply(.data=filing_text_letter6, .variables=c("file","DOCUMENT_INDEX","beg_cum_sum"), 
                                                                          .fun = function(x,bycol,xmlcol){
                                                                            
-                                                                           # x <- filing_text_letter5[(filing_text_letter5[,"DOCUMENT_INDEX"]==1 & filing_text_letter5[,"beg_cum_sum"]==1),]
+                                                                           # x <- filing_text_letter6[(filing_text_letter6[,"DOCUMENT_INDEX"]==1 & filing_text_letter6[,"beg_cum_sum"]==1),]
+                                                                           # x <- filing_text_letter6[(filing_text_letter6[,"DOCUMENT_INDEX"]==1 & filing_text_letter6[,"beg_cum_sum"]==2),]
                                                                            # bycol <- c("file","DOCUMENT_INDEX","beg_cum_sum")
                                                                            # xmlcol <- xmlcol
                                                                            
@@ -888,38 +826,76 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                                            
                                                                            filing_text_letter_extract0 <- x
                                                                            
-                                                                           letter_flag_ending1 <- sum(filing_text_letter_extract0[,"letter_ending"], na.rm = TRUE)
-                                                                           letter_flag_signature1 <- sum(filing_text_letter_extract0[,"letter_signature"], na.rm = TRUE)
-                                                                           letter_flag_position1 <- sum(filing_text_letter_extract0[,"letter_position"], na.rm = TRUE)
                                                                            
-                                                                           if (letter_flag_ending1 != 0) {
+                                                                           #letter_flag_ending1 <- sum(filing_text_letter_extract0[,"letter_ending"], na.rm = TRUE)
+                                                                           #letter_flag_closing1 <- sum(filing_text_letter_extract0[,"letter_closing"], na.rm = TRUE)
+                                                                           #letter_flag_signature1 <- sum(filing_text_letter_extract0[,"letter_signature"], na.rm = TRUE)
+                                                                           #letter_flag_position1 <- sum(filing_text_letter_extract0[,"letter_position"], na.rm = TRUE)
+                                                                           
+                                                                           #if (letter_flag_ending1 != 0) {
+                                                                           #   
+                                                                           #   filing_text_letter_extract0[,"end_cum_sum"] <- cumsum(filing_text_letter_extract0[,"letter_ending"])
+                                                                           #   letter_flag_good <- letter_flag_ending1
+                                                                           #   
+                                                                           #} else if (letter_flag_closing1 != 0) {
+                                                                           #   
+                                                                           #   filing_text_letter_extract0[,"end_cum_sum"] <- cumsum(filing_text_letter_extract0[,"letter_closing"])
+                                                                           #   letter_flag_good <- letter_flag_closing1
+                                                                           #   
+                                                                           #} else if (letter_flag_signature1 != 0) {
+                                                                           #   
+                                                                           #   filing_text_letter_extract0[,"end_cum_sum"] <- cumsum(filing_text_letter_extract0[,"letter_signature"])
+                                                                           #   letter_flag_good <- letter_flag_signature1
+                                                                           #   
+                                                                           #} else if (letter_flag_position1 != 0) {
+                                                                           #  
+                                                                           #   filing_text_letter_extract0[,"end_cum_sum"] <- cumsum(filing_text_letter_extract0[,"letter_position"])
+                                                                           #   letter_flag_good <- letter_flag_position1
+                                                                           #   
+                                                                           #} else {
+                                                                           #   
+                                                                           #   filing_text_letter_extract0[,"end_cum_sum"] <- NA
+                                                                           #   letter_flag_good <- NA
+                                                                           #   
+                                                                           #}
+                                                                           #rm(letter_flag_ending1,letter_flag_signature1,letter_flag_position1)
+                                                                           
+                                                                           
+                                                                           ending_summary_temp <- data.frame( matrix(NA, ncol=6, nrow=4, dimnames=list(c(), c("file","DOCUMENT_INDEX","beg_cum_sum","TYPE","ENDING_PRIORITY","overall_matches"))), stringsAsFactors=FALSE)
+                                                                           ending_summary_temp[1,] <- c(file_temp,index_temp,beg_cum_sum_temp,"letter_ending",1,sum(filing_text_letter_extract0[,"letter_ending"], na.rm = TRUE))
+                                                                           ending_summary_temp[2,] <- c(file_temp,index_temp,beg_cum_sum_temp,"letter_closing",2,sum(filing_text_letter_extract0[,"letter_closing"], na.rm = TRUE))
+                                                                           ending_summary_temp[3,] <- c(file_temp,index_temp,beg_cum_sum_temp,"letter_signature",3,sum(filing_text_letter_extract0[,"letter_signature"], na.rm = TRUE))
+                                                                           ending_summary_temp[4,] <- c(file_temp,index_temp,beg_cum_sum_temp,"letter_position",4,sum(filing_text_letter_extract0[,"letter_position"], na.rm = TRUE))
+                                                                           
+                                                                           ending_summary_temp <- ending_summary_temp[order(ending_summary_temp[,"ENDING_PRIORITY"]),]
+                                                                           
+                                                                           
+                                                                           for (z in 1:nrow(ending_summary_temp))
+                                                                           {
+                                                                             #  z <- 1
                                                                              
-                                                                             filing_text_letter_extract0[,"end_cum_sum"] <- cumsum(filing_text_letter_extract0[,"letter_ending"])
-                                                                             letter_flag_good <- letter_flag_ending1
+                                                                             #cat("CLOSING PRIORITY:",z,"\n")
                                                                              
-                                                                           } else if (letter_flag_signature1 != 0) {
+                                                                             matches <- as.integer(ending_summary_temp[z,"overall_matches"])
                                                                              
-                                                                             filing_text_letter_extract0[,"end_cum_sum"] <- cumsum(filing_text_letter_extract0[,"letter_signature"])
-                                                                             letter_flag_good <- letter_flag_signature1
+                                                                             filing_text_letter_extract0[,"end_cum_sum"] <- cumsum(filing_text_letter_extract0[,ending_summary_temp[z,"TYPE"]])
+                                                                             letter_flag_good <- matches
                                                                              
-                                                                           } else if (letter_flag_position1 != 0) {
-                                                                             
-                                                                             filing_text_letter_extract0[,"end_cum_sum"] <- cumsum(filing_text_letter_extract0[,"letter_position"])
-                                                                             letter_flag_good <- letter_flag_position1
-                                                                             
-                                                                           } else {
-                                                                             
-                                                                             filing_text_letter_extract0[,"end_cum_sum"] <- NA
-                                                                             letter_flag_good <- NA
+                                                                             if (matches!=0) { rm(matches) ; break }
+                                                                             if (z==nrow(ending_summary_temp)) { 
+                                                                               
+                                                                               filing_text_letter_extract0[,"end_cum_sum"] <- NA
+                                                                               letter_flag_good <- NA
+                                                                               rm(matches)
+                                                                             } 
                                                                              
                                                                            }
-                                                                           rm(letter_flag_ending1,letter_flag_signature1,letter_flag_position1)
+                                                                           rm(ending_summary_temp,z)
                                                                            
                                                                            #Check for no ending matches
                                                                            if (is.na(letter_flag_good)) {
                                                                              
-                                                                             cat("NO END MATCHES FOUND", "\n")
-                                                                             
+                                                                             #cat("NO END MATCHES FOUND", "\n")
                                                                              
                                                                              filing_text_letter_extract0_trim <- filing_text_letter_extract0[1,]
                                                                              filing_text_letter_extract0_trim[,xmlcol] <- NA
@@ -941,184 +917,190 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                                            
                                                                          }, bycol=c("file","DOCUMENT_INDEX","beg_cum_sum"),xmlcol=xmlcol,
                                                                          .progress = "none", .inform = FALSE, .drop = FALSE, .parallel = FALSE, .paropts = NULL)
+                                            
+                                            #rm(filing_text_letter6)
+                                            
+                                            
+                                            
+                                            
+                                            #### SHOULD THIS BE HERE?????
                                           }
                                           
-                                          colnames(filing_text_letter6)[match("beg_cum_sum",names(filing_text_letter6))] <- "LETTER_INDEX"
-                                          filing_text_letter6 <- filing_text_letter6[,(colnames(filing_text_letter6) %in% c("file","DOCUMENT_INDEX","LETTER_INDEX",xmlcol))]
-                                          rm(filing_text_letter5,filing_text_letter5_empty_cols)
-                                          
-                                          
-                                          #CLEAN TEXT
-                                          filing_text_parse_clean <- ddply(.data=filing_text_letter6, .variables=c("file","DOCUMENT_INDEX","LETTER_INDEX"), 
-                                                                           .fun = function(x,bycol,xmlcol){
-                                                                             
-                                                                             # x <- filing_text_letter6[filing_text_letter6[,"LETTER_INDEX"]==0,]
-                                                                             # x <- filing_text_letter6[filing_text_letter6[,"LETTER_INDEX"]==1,]
-                                                                             # bycol <- c("file","DOCUMENT_INDEX","LETTER_INDEX")
-                                                                             # xmlcol <- xmlcol
-                                                                             
-                                                                             file_temp <- unique(x[,"file"])
-                                                                             index_temp <- unique(x[,"DOCUMENT_INDEX"])
-                                                                             letter_temp <- unique(x[,"LETTER_INDEX"])
-                                                                             
-                                                                             x[,xmlcol] <- gsub("\n", " ", x[,xmlcol])
-                                                                             
-                                                                             for(i in which(sapply(x,class)=="character"))
-                                                                             {
-                                                                               x[[i]] <- gsub(" {2,}", " ", x[[i]])
-                                                                               x[[i]] <- trim(x[[i]])
-                                                                             }
-                                                                             rm(i)
-                                                                             
-                                                                             for (i in 1:ncol(x))
-                                                                             {
-                                                                               x[,i] <- unknownToNA(x[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
-                                                                                                                     NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
-                                                                                                                     NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
-                                                                               x[,i] <- ifelse(is.na(x[,i]),"", x[,i])
-                                                                             } 
-                                                                             rm(i)
-                                                                             
-                                                                             #Create empty row
-                                                                             x_empty <- x[1,]
-                                                                             x_empty[,xmlcol] <- ""
-                                                                             
-                                                                             #Remove rows until the beginning of the letter
-                                                                             if (length(which(!x[,xmlcol]==""))==0) {
-                                                                               
-                                                                               #cat("ALL ROWS ARE EMPTY", "\n")
-                                                                               x_trim <- x
-                                                                               
-                                                                             } else {
-                                                                               
-                                                                               #cat("ALL ROWS ARE NOT EMPTY", "\n")
-                                                                               x_trim <- x[min(which(!x[,xmlcol]=="")):nrow(x),]
-                                                                               
-                                                                             }
-                                                                             rm(x)
-                                                                             
-                                                                             #Remove rows until the beginning of the letter
-                                                                             if (nrow(x_trim)==1) {
-                                                                               
-                                                                               x_expand_list <- list(x_empty,x_trim[1,],x_empty)
-                                                                               
-                                                                             } else {
-                                                                               
-                                                                               x_expand_list <- list(x_empty,x_trim[1,],x_empty,x_trim[2:nrow(x_trim),],x_empty)
-                                                                               
-                                                                             }
-                                                                             x_expand <- rbindlist(l=x_expand_list, use.names=TRUE, fill=FALSE)
-                                                                             rm(x_expand_list,x_empty,x_trim)
-                                                                             
-                                                                             #Find Empty Rows                                                                                   
-                                                                             x_replace <- data.frame(x_expand,para_start=NA,stringsAsFactors=FALSE)
-                                                                             #x_replace[,xmlcol] <- ifelse(x_replace[,xmlcol]=="","\n", x_replace[,xmlcol])
-                                                                             x_replace[,"para_start"] <- ifelse(x_replace[,xmlcol]=="",1, 0)
-                                                                             x_replace[,"para_start"] <- cumsum(x_replace[,"para_start"])
-                                                                             rm(x_expand)
-                                                                             
-                                                                             #Pad Cells Before Collapse
-                                                                             x_replace[,xmlcol] <- paste(" ", x_replace[,xmlcol], " ", sep="")
-                                                                             
-                                                                             text_collapse1 <-  ddply(.data=x_replace, .variables=c(bycol,"para_start"), .fun = function(z,xmlcol,collapse_str){ 
-                                                                               
-                                                                               z_out <- z
-                                                                               z_out[,xmlcol] <- NA
-                                                                               z_out <- unique(z_out)
-                                                                               
-                                                                               z_out[,xmlcol] <- paste(z[,xmlcol], collapse = collapse_str)
-                                                                               z_out[,xmlcol] <- gsub(" {2,}", " ",z_out[,xmlcol])
-                                                                               z_out[,xmlcol] <- gsub("^\\s+|\\s+$", "", z_out[,xmlcol])
-                                                                               
-                                                                               return(z_out)
-                                                                               
-                                                                             },xmlcol=xmlcol, collapse_str="", .progress = "none", .inform = FALSE, .drop = FALSE, .parallel = FALSE, .paropts = NULL)
-                                                                             
-                                                                             rm(x_replace)
-                                                                             
-                                                                             if (length(which(!text_collapse1[,xmlcol]==""))==0) {
-                                                                               
-                                                                               #cat("ALL ROWS ARE EMPTY", "\n")
-                                                                               text_collapse1_trim <- text_collapse1[1,]
-                                                                               text_collapse1_trim <- text_collapse1_trim[,!(colnames(text_collapse1_trim) %in% c("para_start"))]
-                                                                               
-                                                                             } else {
-                                                                               
-                                                                               #cat("ALL ROWS ARE NOT EMPTY", "\n")
-                                                                               text_collapse1_trim <- text_collapse1[!(text_collapse1[,xmlcol]==""),]
-                                                                               text_collapse1_trim <- text_collapse1_trim[,!(colnames(text_collapse1_trim) %in% c("para_start"))]
-                                                                               
-                                                                             }
-                                                                             rm(text_collapse1)
-                                                                             
-                                                                             text_collapse2 <-  ddply(.data=text_collapse1_trim, .variables=c(bycol), .fun = function(z,xmlcol,collapse_str){ 
-                                                                               
-                                                                               z_out <- z
-                                                                               z_out[,xmlcol] <- NA
-                                                                               z_out <- unique(z_out)
-                                                                               
-                                                                               z_out[,xmlcol] <- paste(z[,xmlcol], collapse = collapse_str)
-                                                                               z_out[,xmlcol] <- gsub(" {2,}", " ",z_out[,xmlcol])
-                                                                               z_out[,xmlcol] <- gsub("^\\s+|\\s+$", "", z_out[,xmlcol])
-                                                                               
-                                                                               return(z_out)
-                                                                               
-                                                                             },xmlcol=xmlcol, collapse_str="\n", .progress = "none", .inform = FALSE, .drop = FALSE, .parallel = FALSE, .paropts = NULL)
-                                                                             
-                                                                             rm(text_collapse1_trim)
-                                                                             
-                                                                             
-                                                                             if (length(which(!text_collapse2[,xmlcol]==""))==0) {
-                                                                               
-                                                                               #cat("ALL ROWS ARE EMPTY", "\n")
-                                                                               text_collapse2_trim <- text_collapse2[1,]
-                                                                               
-                                                                             } else {
-                                                                               
-                                                                               #cat("ALL ROWS ARE NOT EMPTY", "\n")
-                                                                               text_collapse2_trim <- text_collapse2[!(text_collapse2[,xmlcol]==""),]
-                                                                             }
-                                                                             rm(text_collapse2)
-                                                                             
-                                                                             
-                                                                             #colnames(text_collapse2_trim) <- c(bycol,xmlcol)
-                                                                             text_collapse3 <- text_collapse2_trim[,c(colnames(text_collapse2_trim[,!(colnames(text_collapse2_trim) %in% c(xmlcol))]),xmlcol)]
-                                                                             
-                                                                             rm(file_temp,index_temp,letter_temp,text_collapse2_trim)
-                                                                             
-                                                                             return(text_collapse3)
-                                                                             
-                                                                           }, bycol=c("file","DOCUMENT_INDEX","LETTER_INDEX"),xmlcol=xmlcol,
-                                                                           .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
-                                          
-                                          rm(filing_text_letter6)
+                                          colnames(filing_text_letter7)[match("beg_cum_sum",names(filing_text_letter7))] <- "LETTER_INDEX"
+                                          #filing_text_letter8 <- filing_text_letter7[,(colnames(filing_text_letter7) %in% c("file","DOCUMENT_INDEX","LETTER_INDEX",xmlcol,xmltrim_col))]
+                                          filing_text_letter8 <- filing_text_letter7[,c("file","DOCUMENT_INDEX","LETTER_INDEX",xmlcol,xmltrim_col)]
+                                          #rm(filing_text_letter7)
                                           
                                           
                                           
                                           
+                                          #                                           #CLEAN TEXT
+                                          #                                           filing_text_parse_clean <- ddply(.data=filing_text_letter8, .variables=c("file","DOCUMENT_INDEX","LETTER_INDEX"), 
+                                          #                                                                            .fun = function(x,bycol,xmlcol){
+                                          #                                                                              
+                                          #                                                                              # x <- filing_text_letter8[filing_text_letter8[,"LETTER_INDEX"]==0,]
+                                          #                                                                              # x <- filing_text_letter8[filing_text_letter8[,"LETTER_INDEX"]==1,]
+                                          #                                                                              # x <- filing_text_letter8[filing_text_letter8[,"LETTER_INDEX"]==2,]
+                                          #                                                                              # bycol <- c("file","DOCUMENT_INDEX","LETTER_INDEX")
+                                          #                                                                              # xmlcol <- xmlcol
+                                          #                                                                              
+                                          #                                                                              file_temp <- unique(x[,"file"])
+                                          #                                                                              index_temp <- unique(x[,"DOCUMENT_INDEX"])
+                                          #                                                                              letter_temp <- unique(x[,"LETTER_INDEX"])
+                                          #                                                                              
+                                          #                                                                              x[,xmlcol] <- gsub("\n", " ", x[,xmlcol])
+                                          #                                                                              
+                                          #                                                                              for(i in which(sapply(x,class)=="character"))
+                                          #                                                                              {
+                                          #                                                                                x[[i]] <- gsub(" {2,}", " ", x[[i]])
+                                          #                                                                                x[[i]] <- trim(x[[i]])
+                                          #                                                                              }
+                                          #                                                                              rm(i)
+                                          #                                                                              
+                                          #                                                                              for (i in 1:ncol(x))
+                                          #                                                                              {
+                                          #                                                                                x[,i] <- unknownToNA(x[,i], unknown=c("",".","n/a","na","NA",NA,"null","NULL",NULL,"nan","NaN",NaN,
+                                          #                                                                                                                      NA_integer_,"NA_integer_",NA_complex_,"NA_complex_",
+                                          #                                                                                                                      NA_character_,"NA_character_",NA_real_,"NA_real_"),force=TRUE)
+                                          #                                                                                x[,i] <- ifelse(is.na(x[,i]),"", x[,i])
+                                          #                                                                              } 
+                                          #                                                                              rm(i)
+                                          #                                                                              
+                                          #                                                                              #Create empty row
+                                          #                                                                              x_empty <- x[1,]
+                                          #                                                                              x_empty[,xmlcol] <- ""
+                                          #                                                                              
+                                          #                                                                              #Remove rows until the beginning of the letter
+                                          #                                                                              if (length(which(!x[,xmlcol]==""))==0) {
+                                          #                                                                                
+                                          #                                                                                #cat("ALL ROWS ARE EMPTY", "\n")
+                                          #                                                                                x_trim <- x
+                                          #                                                                                
+                                          #                                                                              } else {
+                                          #                                                                                
+                                          #                                                                                #cat("ALL ROWS ARE NOT EMPTY", "\n")
+                                          #                                                                                x_trim <- x[min(which(!x[,xmlcol]=="")):nrow(x),]
+                                          #                                                                                
+                                          #                                                                              }
+                                          #                                                                              rm(x)
+                                          #                                                                              
+                                          #                                                                              #Remove rows until the beginning of the letter
+                                          #                                                                              if (nrow(x_trim)==1) {
+                                          #                                                                                
+                                          #                                                                                x_expand_list <- list(x_empty,x_trim[1,],x_empty)
+                                          #                                                                                
+                                          #                                                                              } else {
+                                          #                                                                                
+                                          #                                                                                x_expand_list <- list(x_empty,x_trim[1,],x_empty,x_trim[2:nrow(x_trim),],x_empty)
+                                          #                                                                                
+                                          #                                                                              }
+                                          #                                                                              x_expand <- rbindlist(l=x_expand_list, use.names=TRUE, fill=FALSE)
+                                          #                                                                              rm(x_expand_list,x_empty,x_trim)
+                                          #                                                                              
+                                          #                                                                              #Find Empty Rows                                                                                   
+                                          #                                                                              x_replace <- data.frame(x_expand,para_start=NA,stringsAsFactors=FALSE)
+                                          #                                                                              #x_replace[,xmlcol] <- ifelse(x_replace[,xmlcol]=="","\n", x_replace[,xmlcol])
+                                          #                                                                              x_replace[,"para_start"] <- ifelse(x_replace[,xmlcol]=="",1, 0)
+                                          #                                                                              x_replace[,"para_start"] <- cumsum(x_replace[,"para_start"])
+                                          #                                                                              rm(x_expand)
+                                          #                                                                              
+                                          #                                                                              #Pad Cells Before Collapse
+                                          #                                                                              x_replace[,xmlcol] <- paste(" ", x_replace[,xmlcol], " ", sep="")
+                                          #                                                                              
+                                          #                                                                              text_collapse1 <-  ddply(.data=x_replace, .variables=c(bycol,"para_start"), .fun = function(z,xmlcol,collapse_str){ 
+                                          #                                                                                
+                                          #                                                                                z_out <- z
+                                          #                                                                                z_out[,xmlcol] <- NA
+                                          #                                                                                z_out <- unique(z_out)
+                                          #                                                                                
+                                          #                                                                                z_out[,xmlcol] <- paste(z[,xmlcol], collapse = collapse_str)
+                                          #                                                                                z_out[,xmlcol] <- gsub(" {2,}", " ",z_out[,xmlcol])
+                                          #                                                                                z_out[,xmlcol] <- gsub("^\\s+|\\s+$", "", z_out[,xmlcol])
+                                          #                                                                                
+                                          #                                                                                return(z_out)
+                                          #                                                                                
+                                          #                                                                              },xmlcol=xmlcol, collapse_str="", .progress = "none", .inform = FALSE, .drop = FALSE, .parallel = FALSE, .paropts = NULL)
+                                          #                                                                              
+                                          #                                                                              rm(x_replace)
+                                          #                                                                              
+                                          #                                                                              if (length(which(!text_collapse1[,xmlcol]==""))==0) {
+                                          #                                                                                
+                                          #                                                                                #cat("ALL ROWS ARE EMPTY", "\n")
+                                          #                                                                                text_collapse1_trim <- text_collapse1[1,]
+                                          #                                                                                text_collapse1_trim <- text_collapse1_trim[,!(colnames(text_collapse1_trim) %in% c("para_start"))]
+                                          #                                                                                
+                                          #                                                                              } else {
+                                          #                                                                                
+                                          #                                                                                #cat("ALL ROWS ARE NOT EMPTY", "\n")
+                                          #                                                                                text_collapse1_trim <- text_collapse1[!(text_collapse1[,xmlcol]==""),]
+                                          #                                                                                text_collapse1_trim <- text_collapse1_trim[,!(colnames(text_collapse1_trim) %in% c("para_start"))]
+                                          #                                                                                
+                                          #                                                                              }
+                                          #                                                                              rm(text_collapse1)
+                                          #                                                                              
+                                          #                                                                              text_collapse2 <-  ddply(.data=text_collapse1_trim, .variables=c(bycol), .fun = function(z,xmlcol,collapse_str){ 
+                                          #                                                                                
+                                          #                                                                                z_out <- z
+                                          #                                                                                z_out[,xmlcol] <- NA
+                                          #                                                                                z_out <- unique(z_out)
+                                          #                                                                                
+                                          #                                                                                z_out[,xmlcol] <- paste(z[,xmlcol], collapse = collapse_str)
+                                          #                                                                                z_out[,xmlcol] <- gsub(" {2,}", " ",z_out[,xmlcol])
+                                          #                                                                                z_out[,xmlcol] <- gsub("^\\s+|\\s+$", "", z_out[,xmlcol])
+                                          #                                                                                
+                                          #                                                                                return(z_out)
+                                          #                                                                                
+                                          #                                                                              },xmlcol=xmlcol, collapse_str="\n", .progress = "none", .inform = FALSE, .drop = FALSE, .parallel = FALSE, .paropts = NULL)
+                                          #                                                                              
+                                          #                                                                              rm(text_collapse1_trim)
+                                          #                                                                              
+                                          #                                                                              
+                                          #                                                                              if (length(which(!text_collapse2[,xmlcol]==""))==0) {
+                                          #                                                                                
+                                          #                                                                                #cat("ALL ROWS ARE EMPTY", "\n")
+                                          #                                                                                text_collapse2_trim <- text_collapse2[1,]
+                                          #                                                                                
+                                          #                                                                              } else {
+                                          #                                                                                
+                                          #                                                                                #cat("ALL ROWS ARE NOT EMPTY", "\n")
+                                          #                                                                                text_collapse2_trim <- text_collapse2[!(text_collapse2[,xmlcol]==""),]
+                                          #                                                                              }
+                                          #                                                                              rm(text_collapse2)
+                                          #                                                                              
+                                          #                                                                              
+                                          #                                                                              #colnames(text_collapse2_trim) <- c(bycol,xmlcol)
+                                          #                                                                              text_collapse3 <- text_collapse2_trim[,c(colnames(text_collapse2_trim[,!(colnames(text_collapse2_trim) %in% c(xmlcol))]),xmlcol)]
+                                          #                                                                              
+                                          #                                                                              rm(file_temp,index_temp,letter_temp,text_collapse2_trim)
+                                          #                                                                              
+                                          #                                                                              return(text_collapse3)
+                                          #                                                                              
+                                          #                                                                            }, bycol=c("file","DOCUMENT_INDEX","LETTER_INDEX"),xmlcol=xmlcol,
+                                          #                                                                            .progress = "none", .inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+                                          #                                           
+                                          #                                           rm(filing_text_letter8)
+                                          #                                           
                                           
                                           
-                                          
-                                          #THERE NEEDS TO BE A TEST TO CHECK IF CHARACTER COUNT IS LARGER THAN 32,767
                                           
                                           
                                           #CREATE FINAL DATA AND OUTPUT
-                                          filing_text_comb <- merge(filing_no_text2, filing_text_parse_clean, 
+                                          filing_text_comb <- merge(filing_no_text2, filing_text_letter8, 
                                                                     by.x=c("file","DOCUMENT_INDEX"), by.y=c("file","DOCUMENT_INDEX"), 
-                                                                    all.x=FALSE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"),incomparables=NA)
+                                                                    all.x=FALSE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"))
                                           
-                                          rm(filing_no_text2,filing_text_parse_clean)
+                                          rm(filing_no_text2,filing_text_letter8)
                                           
                                           #write.table(filing_text_comb,file=filepath_out, append=FALSE, na="", 
                                           #             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
                                           
                                           df_comb_list <- list(filing_text_comb,filing_text_letter_matches_summary,
-                                                               filing_text_letter_matches_beg,filing_text_letter_matches_end,
-                                                               filing_text_letter_matches_pos,filing_text_letter_matches_sign)
+                                                               filing_text_letter_matches_beg,filing_text_letter_matches_end,filing_text_letter_matches_sign,
+                                                               filing_text_letter_matches_pos,filing_text_letter_matches_close)
                                           
                                           rm(filing_text_comb,filing_text_letter_matches_summary)
-                                          rm(filing_text_letter_matches_beg,filing_text_letter_matches_end)
-                                          rm(filing_text_letter_matches_pos,filing_text_letter_matches_sign)
+                                          rm(filing_text_letter_matches_beg,filing_text_letter_matches_end,filing_text_letter_matches_sign)
+                                          rm(filing_text_letter_matches_pos,filing_text_letter_matches_close)
                                           rm(file,filepath)
                                           #rm(file_out,filepath_out)
                                           rm(xmlcol,xmltrim_col)
@@ -1126,10 +1108,12 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                           return(df_comb_list)
                                           
                                         },
-                                        entity_encoding=entity_encoding, hash_table=hash_table,
-                                        letter_beginning=letter_beginning, letter_ending=letter_ending,letter_position=letter_position,letter_signature=letter_signature,letter_closing=letter_closing,
+                                        letter_beginning=letter_beginning, letter_ending=letter_ending,letter_position=letter_position,
+                                        letter_signature=letter_signature,letter_closing=letter_closing,
                                         .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
                        
+                       
+
                        #letters <- bad_tags
                        
                        letters_comb0 <- sapply(letters, "[", 1)
@@ -1172,13 +1156,12 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                        df_comb_list_all <- list(letters_comb,letter_matches_summary,letter_matches_beg,letter_matches_end,letter_matches_pos,letter_matches_sign)
                        
                        rm(letters,letters_comb,letter_matches_summary,letter_matches_beg,letter_matches_end,letter_matches_pos,letter_matches_sign)
-                       rm(yr,yr_folder_path,sub_folder_path,sub_folder_output_path,downloaded_files3)
+                       rm(yr,yr_folder_path,sub_folder_path,downloaded_files3)
                        
                        return(df_comb_list_all)
                        
                      },
-                     path_output=paste(output_directory,downloadfolder,sep=slash),
-                     subfolder=txtfolder_clean,entity_encoding=entity_encoding, hash_table=hash_table,
+                     path_output=paste(output_directory,downloadfolder,sep=slash),subfolder=txtfolder_in,
                      letter_beginning=letter_beginning,letter_ending=letter_ending,letter_position=letter_position,letter_signature=letter_signature,letter_closing=letter_closing,
                      .progress = "text",.inform = TRUE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
 
@@ -1217,7 +1200,7 @@ cat("Output Combined Files \n")
 ###############################################################################
 
 #Check to see if yr folder exists.  If not, create it.
-out_folder_path <- paste(download_folder_path, txtfolder_section, sep = "\\", collapse = "\\")   
+out_folder_path <- paste(download_folder_path, txtfolder_out, sep = "\\", collapse = "\\")   
 create_directory(out_folder_path,remove=1)
 
 write.table(letter_all_comb,file=paste(out_folder_path,"\\","letter_all_comb",".csv",sep=""), append=FALSE, na="NA", 

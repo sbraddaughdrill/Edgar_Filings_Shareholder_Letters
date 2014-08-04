@@ -376,7 +376,7 @@ cat("SECTION: LIBRARIES", "\n")
 ###############################################################################
 
 #Load External Packages
-external_packages <- c("data.table","gdata","gsubfn","plyr","stringr","XML")
+external_packages <- c("data.table","gdata","gsubfn","plyr","qdap","stringr","XML")
 invisible(unlist(sapply(external_packages,load_external_packages, repo_str=repo, simplify=FALSE, USE.NAMES=FALSE)))
 installed_packages <- list_installed_packages(external_packages)
 
@@ -384,29 +384,98 @@ rm(external_packages,installed_packages,repo)
 
 
 ###############################################################################
-cat("Look and Clean Data \n")
+cat("Import Data \n")
 ###############################################################################
 
-punctuation_words0 <- read.table(file=paste(input_directory,"punctuation_words.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 contractions0 <- read.table(file=paste(input_directory,"contractions.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+abbreviations0 <- read.table(file=paste(input_directory,"abbreviations.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 shortened_words0 <- read.table(file=paste(input_directory,"shortened_words.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+punctuation_words0 <- read.table(file=paste(input_directory,"punctuation_words.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 
-punctuation_words1 <- clean_replacement_lookup(file=punctuation_words0,cols_to_clean=c("WORD"))
-punctuation_words <- punctuation_words1
-punctuation_words[,c("WORD")] <- paste(" ",punctuation_words[,c("WORD")]," ",sep="")
+ordinal_lookup0 <- read.table(file=paste(input_directory,"\\","ordinal_lookup",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+
+letter_beginning0 <- read.table(file=paste(input_directory,"letter_beginning.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_ending0 <- read.table(file=paste(input_directory,"letter_ending.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_position0 <- read.table(file=paste(input_directory,"letter_position.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_signature0 <- read.table(file=paste(input_directory,"letter_signature.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+letter_closing0 <- read.table(file=paste(input_directory,"letter_closing.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+
+
+###############################################################################
+cat("Clean Lookup Data \n")
+###############################################################################
 
 contractions1 <- clean_replacement_lookup(file=contractions0,cols_to_clean=c("PATTERN","REPLACEMENT"))
+contractions1[,"PATTERN"] <- toupper(contractions1[,c("PATTERN")])
+contractions1[,"REPLACEMENT"] <- toupper(contractions1[,c("REPLACEMENT")])
 contractions <- contractions1
 contractions[,c("PATTERN")] <- paste(" ",contractions[,c("PATTERN")]," ",sep="")
 contractions[,c("REPLACEMENT")] <- paste(" ",contractions[,c("REPLACEMENT")]," ",sep="")
 
+abbreviations1 <- clean_replacement_lookup(file=abbreviations0,cols_to_clean=c("PATTERN","REPLACEMENT"))
+abbreviations1[,"PATTERN"] <- toupper(abbreviations1[,c("PATTERN")])
+abbreviations1[,"REPLACEMENT"] <- toupper(abbreviations1[,c("REPLACEMENT")])
+abbreviations <- abbreviations1
+abbreviations[,c("PATTERN")] <- paste(" ",abbreviations[,c("PATTERN")]," ",sep="")
+abbreviations[,c("REPLACEMENT")] <- paste(" ",abbreviations[,c("REPLACEMENT")]," ",sep="")
+
 shortened_words1 <- clean_replacement_lookup(file=shortened_words0,cols_to_clean=c("PATTERN","REPLACEMENT"))
+shortened_words1[,"PATTERN"] <- toupper(shortened_words1[,c("PATTERN")])
+shortened_words1[,"REPLACEMENT"] <- toupper(shortened_words1[,c("REPLACEMENT")])
 shortened_words <- shortened_words1
 shortened_words[,c("PATTERN")] <- paste(" ",shortened_words[,c("PATTERN")]," ",sep="")
 shortened_words[,c("REPLACEMENT")] <- paste(" ",shortened_words[,c("REPLACEMENT")]," ",sep="")
 
-rm(punctuation_words0,contractions0,shortened_words0)
-#rm(punctuation_words1,contractions1,shortened_words1)
+punctuation_words1 <- clean_replacement_lookup(file=punctuation_words0,cols_to_clean=c("WORD"))
+punctuation_words1[,"WORD"] <- toupper(punctuation_words1[,c("WORD")])
+punctuation_words <- punctuation_words1
+punctuation_words[,c("WORD")] <- paste(" ",punctuation_words[,c("WORD")]," ",sep="")
+
+ordinal_lookup1 <- clean_replacement_lookup(file=ordinal_lookup0,cols_to_clean=c("PATTERN","REPLACEMENT"))
+ordinal_lookup1[,"PATTERN"] <- toupper(ordinal_lookup1[,c("PATTERN")])
+ordinal_lookup1[,"REPLACEMENT"] <- toupper(ordinal_lookup1[,c("REPLACEMENT")])
+ordinal_lookup <- ordinal_lookup1
+ordinal_lookup[,c("PATTERN")] <- paste(" ",ordinal_lookup[,c("PATTERN")]," ",sep="")
+ordinal_lookup[,c("REPLACEMENT")] <- paste(" ",ordinal_lookup[,c("REPLACEMENT")]," ",sep="")
+
+rm(abbreviations0,contractions0,shortened_words0,punctuation_words0,ordinal_lookup0)
+#rm(abbreviations1,contractions1,shortened_words1,punctuation_words1,ordinal_lookup1)
+
+
+###############################################################################
+cat("Expand Abbreviations \n")
+###############################################################################
+
+abbreviations1_expand0 <- expand_patterns(abbreviations1)
+abbreviations1_expand0[,"PATTERN"] <- gsub("-"," ",abbreviations1_expand0[,"PATTERN"])
+abbreviations1_expand0 <- unique(abbreviations1_expand0)
+abbreviations1_expand0 <- abbreviations1_expand0[order(abbreviations1_expand0[,"PATTERN"],abbreviations1_expand0[,"REPLACEMENT"]),]
+
+abbreviations1_expand1 <- expand_patterns(abbreviations1_expand0)
+abbreviations1_expand1[,"REPLACEMENT"] <- gsub(" ","-",abbreviations1_expand1[,"REPLACEMENT"])
+abbreviations1_expand1 <- unique(abbreviations1_expand1)
+abbreviations1_expand1 <- abbreviations1_expand1[order(abbreviations1_expand1[,"PATTERN"],abbreviations1_expand1[,"REPLACEMENT"]),]
+
+abbreviations1_expand2 <- expand_patterns(abbreviations1_expand1)
+abbreviations1_expand2[,"PATTERN"] <- gsub("-"," ",abbreviations1_expand2[,"PATTERN"])
+abbreviations1_expand2[,"REPLACEMENT"] <- gsub(" ","-",abbreviations1_expand2[,"REPLACEMENT"])
+abbreviations1_expand2 <- unique(abbreviations1_expand2)
+abbreviations1_expand2 <- abbreviations1_expand2[order(abbreviations1_expand2[,"PATTERN"],abbreviations1_expand2[,"REPLACEMENT"]),]
+
+#abbreviations1_expand <- rbind(abbreviations1_expand0,abbreviations1_expand1)
+abbreviations1_expand <- rbindlist(l=list(abbreviations1_expand1,abbreviations1_expand2), use.names=TRUE, fill=FALSE)
+abbreviations1_expand <- as.data.frame(abbreviations1_expand,stringsAsFactors=FALSE)
+
+abbreviations1_expand <- unique(abbreviations1_expand)
+abbreviations1_expand <- abbreviations1_expand[(abbreviations1_expand[,"REPLACEMENT"] != abbreviations1_expand[,"PATTERN"]),]
+abbreviations1_expand <- abbreviations1_expand[order(abbreviations1_expand[,"PATTERN"],abbreviations1_expand[,"REPLACEMENT"]),]
+row.names(abbreviations1_expand) <- seq(nrow(abbreviations1_expand))
+
+abbreviations_expand <- abbreviations1_expand
+abbreviations_expand[,c("PATTERN")] <- paste(" ",abbreviations_expand[,c("PATTERN")]," ",sep="")
+abbreviations_expand[,c("REPLACEMENT")] <- paste(" ",abbreviations_expand[,c("REPLACEMENT")]," ",sep="")
+
+rm(abbreviations1_expand0,abbreviations1_expand1,abbreviations1_expand2)
 
 
 ###############################################################################
@@ -415,13 +484,15 @@ cat("Expand Punctuation \n")
 
 punct_u0 <- punctuation_words1
 
-punct_u0[,"WORD"] <- gsub("[[:alpha:]]+","",punct_u0[,"WORD"])
-punct_u0[,"WORD"] <- gsub("[[:digit:]]+","",punct_u0[,"WORD"])
+punct_u0[,"WORD"] <- gsub("[^[:punct:]]+","",punct_u0[,"WORD"])
+#punct_u0[,"WORD"] <- gsub("[[:alpha:]]+","",punct_u0[,"WORD"])
+#punct_u0[,"WORD"] <- gsub("[[:digit:]]+","",punct_u0[,"WORD"])
 
 punct_u1 <- unique(punct_u0[,"WORD"])
 punct_u2 <- paste(punct_u1,sep="",collapse=" ")
 
 punct_u3 <- unlist(strsplit(punct_u2, "*"))
+
 punct_u4 <- unique(punct_u3)
 
 rm(punct_u0,punct_u1,punct_u2,punct_u3)
@@ -435,14 +506,14 @@ punct_u_trim <- punct_u_trim0[punct_u_trim0!=""]
 
 punct_u_expand <- expand.grid(rep(list(punct_u_trim), length(punct_u_trim)),KEEP.OUT.ATTRS = TRUE, stringsAsFactors = FALSE)
 
-
 i <- sapply(punct_u_expand, is.factor)
 punct_u_expand[i] <- lapply(punct_u_expand[i], as.character)
 rm(i)
 
 
-punct_u_expand_id <- data.frame(ID=NA,punct_u_expand,stringsAsFactors=FALSE)
-punct_u_expand_id[,"ID"] <- seq(1,nrow(punct_u_expand_id),1)
+#punct_u_expand_id <- data.frame(ID=NA,punct_u_expand,stringsAsFactors=FALSE)
+#punct_u_expand_id[,"ID"] <- seq(1,nrow(punct_u_expand_id),1)
+punct_u_expand_id <- punct_u_expand
 
 rm(punct_u_expand)
 
@@ -450,7 +521,8 @@ cols    <- names(punct_u_expand_id)[grepl('^Var[[:digit:]]+$',names(punct_u_expa
 cols_str <- paste(cols,sep="",collapse=",")
 paste_str <- paste("paste(",cols_str,",sep='')")
 
-punct_u_expand_dt <- data.table(punct_u_expand_id, key="ID")
+#punct_u_expand_dt <- data.table(punct_u_expand_id, key="ID")
+punct_u_expand_dt <- data.table(punct_u_expand_id)
 
 rm(punct_u_expand_id)
 
@@ -500,102 +572,61 @@ punctuation_words1_df_expand <- unique(punctuation_words1_df_expand)
 punctuation_words1_df_expand <- punctuation_words1_df_expand[order(punctuation_words1_df_expand[,"REPLACEMENT"],punctuation_words1_df_expand[,"PATTERN"]),]
 row.names(punctuation_words1_df_expand) <- seq(nrow(punctuation_words1_df_expand))
 
+punctuation_words1_df_expand_pad <- punctuation_words1_df_expand
+punctuation_words1_df_expand_pad[,"REPLACEMENT"] <- paste(" ",punctuation_words1_df_expand_pad[,"REPLACEMENT"]," ",sep="")
+punctuation_words1_df_expand_pad[,"PATTERN"] <- paste(" ",punctuation_words1_df_expand_pad[,"PATTERN"]," ",sep="")
+
 rm(punctuation_words1_df)
+
+
+###############################################################################
+cat("REPLACE BRACKETS \n")
+###############################################################################
+
+#punctuation_words_bracket_replace0 <- punctuation_words_contraction_replace
+#punctuation_words_bracket_replace1 <- punctuation_words_contraction_replace
+
+punctuation_words_bracket_replace0 <- punctuation_words1_df_expand_pad
+punctuation_words_bracket_replace1 <- punctuation_words1_df_expand_pad
+
+punctuation_words_bracket_replace1[,c("REPLACEMENT")] <- bracketX(clean(text.var=punctuation_words_bracket_replace1[,c("REPLACEMENT")]), bracket = "all", missing = "", names = FALSE)
+
+punctuation_words_bracket_replace1[,c("REPLACEMENT")] <- toupper(punctuation_words_bracket_replace1[,c("REPLACEMENT")])
+punctuation_words_bracket_replace1[,c("REPLACEMENT")] <- paste(" ",punctuation_words_bracket_replace1[,c("REPLACEMENT")]," ",sep="")
+
+punctuation_words_bracket_replace <- expand_patterns(punctuation_words_bracket_replace1)
+
+punctuation_words_bracket_replace <- unique(punctuation_words_bracket_replace)
+punctuation_words_bracket_replace <- as.data.frame(punctuation_words_bracket_replace,stringsAsFactors=FALSE)
+punctuation_words_bracket_replace <- punctuation_words_bracket_replace[order(punctuation_words_bracket_replace[,"PATTERN"],punctuation_words_bracket_replace[,"REPLACEMENT"]),]
+row.names(punctuation_words_bracket_replace) <- seq(nrow(punctuation_words_bracket_replace))
+
+rm(punctuation_words_bracket_replace0,punctuation_words_bracket_replace1)
 
 
 ###############################################################################
 cat("Convert ordinal numbers to numeric \n")
 ###############################################################################
 
-ordinal_lookup <- data.frame(matrix(NA, ncol=2, nrow=19, 
-                                    dimnames=list(c(), c("PATTERN","REPLACEMENT"))), 
-                             stringsAsFactors=FALSE)
+#punctuation_words_ordinal_replace0 <- punctuation_words1_df_expand_pad
+#punctuation_words_ordinal_replace1 <- punctuation_words1_df_expand_pad
 
-ordinal_lookup[1,] <- c("FIRST","1ST")
-ordinal_lookup[2,] <- c("SECOND","2ND")
-ordinal_lookup[3,] <- c("THIRD","3RD")
-ordinal_lookup[4,] <- c("FOURTH","4TH")
-ordinal_lookup[5,] <- c("FIFTH","5TH")
-ordinal_lookup[6,] <- c("SIXTH","6TH")
-ordinal_lookup[7,] <- c("SEVENTH","7TH")
-ordinal_lookup[8,] <- c("EIGHTH","8TH")
-ordinal_lookup[9,] <- c("NINTH","9TH")
-ordinal_lookup[10,] <- c("TENTH","10TH")
-ordinal_lookup[11,] <- c("ELEVENTH","11TH")
-ordinal_lookup[12,] <- c("TWELFTH","12TH")
-ordinal_lookup[13,] <- c("THIRTEENTH","13TH")
-ordinal_lookup[14,] <- c("FOURTEENTH","14TH")
-ordinal_lookup[15,] <- c("FIFTEENTH","15TH")
-ordinal_lookup[16,] <- c("SIXTEENTH","16TH")
-ordinal_lookup[17,] <- c("SEVENTEENTH","17TH")
-ordinal_lookup[18,] <- c("EIGHTEENTH","18TH")
-ordinal_lookup[19,] <- c("NINETEENTH","19TH")
+punctuation_words_ordinal_replace0 <- punctuation_words_bracket_replace
+punctuation_words_ordinal_replace1 <- punctuation_words_bracket_replace
 
-pattern0 <- paste(punct_u4,collapse="")
-pattern1a <- paste("(?<=[",pattern0,"])",sep="")
-#pattern1b <- paste("([^",pattern0,"]+)([",pattern0,"]|$)",sep="")
-#pattern1b <- paste("([^",pattern0,"])([",pattern0,"]|$)",sep="")
-#pattern1b <- paste("([^",pattern0,"]*)([",pattern0,"]*|$)",sep="")
-pattern1b <- paste("([^",pattern0,"]*)([",pattern0,"]|$)",sep="")
+punctuation_words_ordinal_replace1 <- data.table(punctuation_words_ordinal_replace1)
 
-#punctuation_words_ordinal_replace0 <- punctuation_words1[,"WORD"]
-#punctuation_words_ordinal_replace0 <- punctuation_words1_df
-
-punctuation_words_ordinal_replace0 <- punctuation_words1_df_expand
-
-punctuation_words_ordinal_replace1 <- punctuation_words1_df_expand
-
-punctuation_words_ordinal_replace1[,"REPLACEMENT"] <- ldply(.data=punctuation_words_ordinal_replace1[,"REPLACEMENT"], .fun = function(x,pattern1,pattern2,lookup){
+for(k in 1:nrow(ordinal_lookup1))
+{
+  # k <- 1
   
-  # x <- "first-://SECOND"
-  # x <- punctuation_words_ordinal_replace1[803,"REPLACEMENT"]
-  # x <- punctuation_words_ordinal_replace1[1990,"REPLACEMENT"]
-  # x <- punctuation_words_ordinal_replace1[1991,"REPLACEMENT"]
-  # pattern1 <- pattern1a
-  # pattern2 <- pattern1b
-  # lookup <- ordinal_lookup
+  set(punctuation_words_ordinal_replace1, i=NULL, j="REPLACEMENT", value=gsub(ordinal_lookup1[k,c("PATTERN")], ordinal_lookup1[k,c("REPLACEMENT")], punctuation_words_ordinal_replace1[["REPLACEMENT"]], ignore.case = TRUE, perl=TRUE))
   
-  aa1a <- strsplit(x,pattern1,perl=TRUE)
-  aa1b <- unlist(aa1a)
-  
-  aa2a <- strapply(aa1b, pattern2, ~ c(...), b= -2)
-  aa2b <- unlist(aa2a)
-  
-  bb <- data.table(aa2b)
-  setnames(bb,"WORD")
-  
-  for(k in 1:nrow(lookup))
-  {
-    # k <- 1
-    
-    set(bb, i=NULL, j="WORD", value=gsub(lookup[k,c("PATTERN")], lookup[k,c("REPLACEMENT")], bb[["WORD"]], ignore.case = TRUE, perl=TRUE))
-    
-  }
-  rm(lookup,k)
-  
-  cc <- paste(unlist(bb),sep="",collapse="")
-  
-  return(cc)
-  
-}, pattern1=pattern1a, pattern2=pattern1b, lookup=ordinal_lookup,.progress = "text", .inform = FALSE,.parallel = FALSE, .paropts = NULL, .id = NA)
+}
+rm(k)
 
-rm(ordinal_lookup,pattern0,pattern1a,pattern1b)
 
-#punctuation_words_ordinal_replace1 <- as.data.frame(punctuation_words_ordinal_replace1,stringsAsFactors=FALSE)
-#colnames(punctuation_words_ordinal_replace1) <- "WORD"
-#punctuation_words_ordinal_replace1 <- punctuation_words_ordinal_replace1[order(punctuation_words_ordinal_replace1[,"WORD"]),]
-#punctuation_words_ordinal_replace1 <- as.data.frame(punctuation_words_ordinal_replace1,stringsAsFactors=FALSE)
-#colnames(punctuation_words_ordinal_replace1) <- "WORD"
-
-#punctuation_words_ordinal_replace <- rbind(punctuation_words1,punctuation_words_ordinal_replace1)
-#punctuation_words_ordinal_replace <- unique(punctuation_words_ordinal_replace)
-#punctuation_words_ordinal_replace <- as.data.frame(punctuation_words_ordinal_replace,stringsAsFactors=FALSE)
-#colnames(punctuation_words_ordinal_replace) <- "WORD"
-
-#punctuation_words_ordinal_replace <- punctuation_words_ordinal_replace[order(punctuation_words_ordinal_replace[,"WORD"]),]
-#punctuation_words_ordinal_replace <- as.data.frame(punctuation_words_ordinal_replace,stringsAsFactors=FALSE)
-#colnames(punctuation_words_ordinal_replace) <- "WORD"
-
+punctuation_words_ordinal_replace1 <- as.data.frame(punctuation_words_ordinal_replace1,stringsAsFactors=FALSE)
 
 #punctuation_words_ordinal_replace <- rbindlist(l=list(punctuation_words_ordinal_replace0,punctuation_words_ordinal_replace1), use.names=TRUE, fill=FALSE)
 punctuation_words_ordinal_replace <- expand_patterns(punctuation_words_ordinal_replace1)
@@ -609,101 +640,19 @@ rm(punctuation_words_ordinal_replace0,punctuation_words_ordinal_replace1)
 
 
 ###############################################################################
-cat("Convert written numbers to numeric \n")
+cat("REPLACE NUMBER \n")
 ###############################################################################
 
-pattern0 <- paste(punct_u4,collapse="")
-pattern1a <- paste("(?<=[",pattern0,"])",sep="")
-#pattern1b <- paste("([^",pattern0,"]+)([",pattern0,"]|$)",sep="")
-#pattern1b <- paste("([^",pattern0,"])([",pattern0,"]|$)",sep="")
-#pattern1b <- paste("([^",pattern0,"]*)([",pattern0,"]*|$)",sep="")
-pattern1b <- paste("([^",pattern0,"]*)([",pattern0,"]|$)",sep="")
-
-#punctuation_words_num_replace0 <- punctuation_words_ordinal_replace
-#punctuation_words_ordinal_replace0 <- punctuation_words1[,"WORD"]
-#punctuation_words_num_replace0 <- punctuation_words_ordinal_replace
-
-#punctuation_words_num_replace0 <- expand_patterns(punctuation_words_ordinal_replace)
-#punctuation_words_num_replace0 <- unique(punctuation_words_num_replace0)
-
 punctuation_words_num_replace0 <- punctuation_words_ordinal_replace
-
 punctuation_words_num_replace1 <- punctuation_words_ordinal_replace
 
-punctuation_words_num_replace1[,"REPLACEMENT"] <- ldply(.data=punctuation_words_num_replace1[,"REPLACEMENT"], .fun = function(x,pattern1,pattern2){
-  
-  # x <- "THIS IS A TEST ONE-/()%'TWO"
-  # x <- punctuation_words_num_replace1[803,"REPLACEMENT"]
-  # x <- punctuation_words_num_replace1[1990,"REPLACEMENT"]
-  # x <- punctuation_words_num_replace1[1991,"REPLACEMENT"]
-  # pattern1 <- pattern1a
-  # pattern2 <- pattern1b
-  
-  aa1a <- strsplit(x,pattern1,perl=TRUE)
-  aa1b <- unlist(aa1a)
-  
-  aa2a <- strapply(aa1b, pattern2, ~ c(...), b= -2)
-  aa2b <- unlist(aa2a)
-  
-  bb <- ldply(.data=aa2b, .fun = function(y){
-    
-    # y <- aa[2]
-    # y <- "one"
-    # y <- ""
-    # y <- "  "
-    # y <- 1
-    
-    y_trim <- y
-    y_trim <- gsub(" {2,}", " ",y_trim)
-    y_trim <- gsub("^\\s+|\\s+$", "", y_trim)
-    
-    if(y_trim != "") 
-    {
-      bb2 <-  try(word2num(y),silent=TRUE)
-      
-      if(is(bb2,"try-error")) {
-        
-        output <- y
-        
-      } else {
-        
-        output <- bb2[[2]]
-        
-      }
-      
-    } else {
-      output <- y
-    }
-    
-    return(output)
-    
-  }, .progress = "none", .inform = FALSE, .parallel = FALSE, .paropts = NULL, .id = NA)
-  
-  cc <- paste(unlist(bb),sep="",collapse="")
-  
-  return(cc)
-  
-}, pattern1=pattern1a, pattern2=pattern1b, .progress = "text", .inform = FALSE,.parallel = FALSE, .paropts = NULL, .id = NA)
+#punctuation_words_num_replace1[,c("REPLACEMENT")] <- gsub("0","ZERO",punctuation_words_num_replace1[,c("REPLACEMENT")])
+punctuation_words_num_replace1[,c("REPLACEMENT")] <- gsub("[^0-9]+(0)+[^0-9]","ZERO",punctuation_words_num_replace1[,c("REPLACEMENT")])
+punctuation_words_num_replace1[,c("REPLACEMENT")] <- replace_number(text.var=punctuation_words_num_replace1[,c("REPLACEMENT")], num.paste = TRUE)
 
-rm(pattern0,pattern1a,pattern1b)
+punctuation_words_num_replace1[,c("REPLACEMENT")] <- toupper(punctuation_words_num_replace1[,c("REPLACEMENT")])
+punctuation_words_num_replace1[,c("REPLACEMENT")] <- paste(" ",punctuation_words_num_replace1[,c("REPLACEMENT")]," ",sep="")
 
-#punctuation_words_num_replace1 <- as.data.frame(punctuation_words_num_replace1,stringsAsFactors=FALSE)
-#colnames(punctuation_words_num_replace1) <- "WORD"
-#punctuation_words_num_replace1 <- punctuation_words_num_replace1[order(punctuation_words_num_replace1[,"WORD"]),]
-#punctuation_words_num_replace1 <- as.data.frame(punctuation_words_num_replace1,stringsAsFactors=FALSE)
-#colnames(punctuation_words_num_replace1) <- "WORD"
-
-#punctuation_words_num_replace <- rbind(punctuation_words_ordinal_replace,punctuation_words_num_replace1)
-#punctuation_words_num_replace <- unique(punctuation_words_num_replace)
-#punctuation_words_num_replace <- as.data.frame(punctuation_words_num_replace,stringsAsFactors=FALSE)
-#colnames(punctuation_words_num_replace) <- "WORD"
-
-#punctuation_words_num_replace <- punctuation_words_num_replace[order(punctuation_words_num_replace[,"WORD"]),]
-#punctuation_words_num_replace <- as.data.frame(punctuation_words_num_replace,stringsAsFactors=FALSE)
-#colnames(punctuation_words_num_replace) <- "WORD"
-
-
-#punctuation_words_num_replace <- rbindlist(l=list(punctuation_words_num_replace0,punctuation_words_num_replace1), use.names=TRUE, fill=FALSE)
 punctuation_words_num_replace <- expand_patterns(punctuation_words_num_replace1)
 
 punctuation_words_num_replace <- unique(punctuation_words_num_replace)
@@ -715,8 +664,160 @@ rm(punctuation_words_num_replace0,punctuation_words_num_replace1)
 
 
 ###############################################################################
+cat("REPLACE CONTRACTIONS \n")
+###############################################################################
+
+#contractions_expand0 <- contractions1
+#contractions_expand0[,"PATTERN"] <- gsub("'","",contractions_expand0[,"PATTERN"])
+#contractions_expand <- rbind(contractions1,contractions_expand0)
+
+#contractions_expand <- unique(contractions_expand)
+#contractions_expand <- as.data.frame(contractions_expand,stringsAsFactors=FALSE)
+#contractions_expand <- contractions_expand[order(contractions_expand[,"PATTERN"],contractions_expand[,"REPLACEMENT"]),]
+#row.names(contractions_expand) <- seq(nrow(contractions_expand))
+
+punctuation_words_contraction_replace0 <- punctuation_words_num_replace
+punctuation_words_contraction_replace1 <- punctuation_words_num_replace
+
+punctuation_words_contraction_replace1 <- data.table(punctuation_words_contraction_replace1)
+
+for(k in 1:nrow(contractions1))
+{
+  # k <- 1
+  
+  set(punctuation_words_contraction_replace1, i=NULL, j="REPLACEMENT", value=gsub(contractions1[k,c("PATTERN")], contractions1[k,c("REPLACEMENT")], punctuation_words_contraction_replace1[["REPLACEMENT"]], ignore.case = TRUE, perl=TRUE))
+   
+}
+rm(k)
+
+
+punctuation_words_contraction_replace1 <- as.data.frame(punctuation_words_contraction_replace1,stringsAsFactors=FALSE)
+
+punctuation_words_contraction_replace <- expand_patterns(punctuation_words_contraction_replace1)
+
+punctuation_words_contraction_replace <- unique(punctuation_words_contraction_replace)
+punctuation_words_contraction_replace <- as.data.frame(punctuation_words_contraction_replace,stringsAsFactors=FALSE)
+punctuation_words_contraction_replace <- punctuation_words_contraction_replace[order(punctuation_words_contraction_replace[,"PATTERN"],punctuation_words_contraction_replace[,"REPLACEMENT"]),]
+row.names(punctuation_words_contraction_replace) <- seq(nrow(punctuation_words_contraction_replace))
+
+rm(punctuation_words_contraction_replace0,punctuation_words_contraction_replace1)
+
+
+# ###############################################################################
+# cat("REPLACE BRACKETS \n")
+# ###############################################################################
+# 
+# punctuation_words_bracket_replace0 <- punctuation_words_contraction_replace
+# punctuation_words_bracket_replace1 <- punctuation_words_contraction_replace
+# 
+# punctuation_words_bracket_replace1[,c("REPLACEMENT")] <- bracketX(clean(text.var=punctuation_words_bracket_replace1[,c("REPLACEMENT")]), bracket = "all", missing = "", names = FALSE)
+# 
+# punctuation_words_bracket_replace1[,c("REPLACEMENT")] <- toupper(punctuation_words_bracket_replace1[,c("REPLACEMENT")])
+# punctuation_words_bracket_replace1[,c("REPLACEMENT")] <- paste(" ",punctuation_words_bracket_replace1[,c("REPLACEMENT")]," ",sep="")
+# 
+# punctuation_words_bracket_replace <- expand_patterns(punctuation_words_bracket_replace1)
+# 
+# punctuation_words_bracket_replace <- unique(punctuation_words_bracket_replace)
+# punctuation_words_bracket_replace <- as.data.frame(punctuation_words_bracket_replace,stringsAsFactors=FALSE)
+# punctuation_words_bracket_replace <- punctuation_words_bracket_replace[order(punctuation_words_bracket_replace[,"PATTERN"],punctuation_words_bracket_replace[,"REPLACEMENT"]),]
+# row.names(punctuation_words_bracket_replace) <- seq(nrow(punctuation_words_bracket_replace))
+# 
+# rm(punctuation_words_bracket_replace0,punctuation_words_bracket_replace1)
+
+
+###############################################################################
+cat("REPLACE ABBREVIATIONS \n")
+###############################################################################
+
+#punctuation_words_abbreviation_replace0 <- punctuation_words_bracket_replace
+#punctuation_words_abbreviation_replace1 <- punctuation_words_bracket_replace
+
+punctuation_words_abbreviation_replace0 <- punctuation_words_contraction_replace
+punctuation_words_abbreviation_replace1 <- punctuation_words_contraction_replace
+
+punctuation_words_abbreviation_replace1 <- data.table(punctuation_words_abbreviation_replace1)
+
+for(k in 1:nrow(abbreviations_expand))
+{
+  # k <- 1
+  
+  set(punctuation_words_abbreviation_replace1, i=NULL, j="REPLACEMENT", value=gsub(abbreviations_expand[k,c("PATTERN")], abbreviations_expand[k,c("REPLACEMENT")], punctuation_words_abbreviation_replace1[["REPLACEMENT"]], ignore.case = TRUE, perl=TRUE))
+  
+}
+rm(k)
+
+punctuation_words_abbreviation_replace1 <- as.data.frame(punctuation_words_abbreviation_replace1,stringsAsFactors=FALSE)
+
+punctuation_words_abbreviation_replace <- expand_patterns(punctuation_words_abbreviation_replace1)
+
+punctuation_words_abbreviation_replace <- unique(punctuation_words_abbreviation_replace)
+punctuation_words_abbreviation_replace <- as.data.frame(punctuation_words_abbreviation_replace,stringsAsFactors=FALSE)
+punctuation_words_abbreviation_replace <- punctuation_words_abbreviation_replace[order(punctuation_words_abbreviation_replace[,"PATTERN"],punctuation_words_abbreviation_replace[,"REPLACEMENT"]),]
+row.names(punctuation_words_abbreviation_replace) <- seq(nrow(punctuation_words_abbreviation_replace))
+
+rm(punctuation_words_abbreviation_replace0,punctuation_words_abbreviation_replace1,abbreviations_expand)
+
+
+###############################################################################
+cat("REPLACE SYMBOLS \n")
+###############################################################################
+
+punctuation_words_symbol_replace0 <- punctuation_words_abbreviation_replace
+punctuation_words_symbol_replace1 <- punctuation_words_abbreviation_replace
+
+punctuation_words_symbol_replace1[,c("REPLACEMENT")] <- replace_symbol(text.var=punctuation_words_symbol_replace1[,c("REPLACEMENT")], 
+                                                                       dollar = TRUE, percent = TRUE, pound = TRUE,at = TRUE, and = TRUE, with = TRUE)
+
+punctuation_words_symbol_replace1[,c("REPLACEMENT")] <- toupper(punctuation_words_symbol_replace1[,c("REPLACEMENT")])
+punctuation_words_symbol_replace1[,c("REPLACEMENT")] <- paste(" ",punctuation_words_symbol_replace1[,c("REPLACEMENT")]," ",sep="")
+
+punctuation_words_symbol_replace <- expand_patterns(punctuation_words_symbol_replace1)
+
+punctuation_words_symbol_replace <- unique(punctuation_words_symbol_replace)
+punctuation_words_symbol_replace <- as.data.frame(punctuation_words_symbol_replace,stringsAsFactors=FALSE)
+punctuation_words_symbol_replace <- punctuation_words_symbol_replace[order(punctuation_words_symbol_replace[,"PATTERN"],punctuation_words_symbol_replace[,"REPLACEMENT"]),]
+row.names(punctuation_words_symbol_replace) <- seq(nrow(punctuation_words_symbol_replace))
+
+rm(punctuation_words_symbol_replace0,punctuation_words_symbol_replace1)
+
+
+###############################################################################
+cat("TRIM AND SCRUB \n")
+###############################################################################
+
+punctuation_words_scrub0 <- punctuation_words_symbol_replace
+punctuation_words_scrub1 <- punctuation_words_symbol_replace
+
+punctuation_words_scrub1[,c("PATTERN")] <- Trim(scrubber(punctuation_words_scrub1[,c("PATTERN")]))
+punctuation_words_scrub1[,c("PATTERN")] <- gsub(" {2,}", " ",punctuation_words_scrub1[,c("PATTERN")])
+punctuation_words_scrub1[,c("PATTERN")] <- gsub("^\\s+|\\s+$", "",punctuation_words_scrub1[,c("PATTERN")])
+
+punctuation_words_scrub1[,c("REPLACEMENT")] <- Trim(scrubber(punctuation_words_scrub1[,c("REPLACEMENT")]))
+punctuation_words_scrub1[,c("REPLACEMENT")] <- gsub(" {2,}", " ",punctuation_words_scrub1[,c("REPLACEMENT")])
+punctuation_words_scrub1[,c("REPLACEMENT")] <- gsub("^\\s+|\\s+$", "",punctuation_words_scrub1[,c("REPLACEMENT")])
+
+punctuation_words_scrub1[,c("REPLACEMENT")] <- gsub("-+", "-",punctuation_words_scrub1[,c("REPLACEMENT")])
+punctuation_words_scrub1[,c("REPLACEMENT")] <- gsub("- ", "-",punctuation_words_scrub1[,c("REPLACEMENT")])
+punctuation_words_scrub1[,c("REPLACEMENT")] <- gsub(" -", "-",punctuation_words_scrub1[,c("REPLACEMENT")])
+
+punctuation_words_scrub <- expand_patterns(punctuation_words_scrub1)
+
+punctuation_words_scrub[,c("REPLACEMENT")] <- gsub(" ", "-",punctuation_words_scrub[,c("REPLACEMENT")])
+
+punctuation_words_scrub <- unique(punctuation_words_scrub)
+punctuation_words_scrub <- as.data.frame(punctuation_words_scrub,stringsAsFactors=FALSE)
+punctuation_words_scrub <- punctuation_words_scrub[order(punctuation_words_scrub[,"PATTERN"],punctuation_words_scrub[,"REPLACEMENT"]),]
+row.names(punctuation_words_scrub) <- seq(nrow(punctuation_words_scrub))
+
+rm(punctuation_words_scrub0,punctuation_words_scrub1)
+
+
+###############################################################################
 cat("Create Combinations of input datasets \n")
 ###############################################################################
+
+#punctuation_data <- punctuation_words_num_replace
+punctuation_data <- punctuation_words_scrub
 
 contractions_expand1 <- expand_patterns(contractions1)
 #contractions_expand <- unique(contractions_expand1[,1])
@@ -739,12 +840,12 @@ rm(contractions_expand1,shortened_words_expand1)
 #contractions_shortened_words_expand1[,c("REPLACEMENT")] <- gsub(" {2,}", " ",contractions_shortened_words_expand1[,c("REPLACEMENT")])
 #contractions_shortened_words_expand1[,c("REPLACEMENT")] <- gsub("^\\s+|\\s+$", "", contractions_shortened_words_expand1[,c("REPLACEMENT")])
 
-#all_words_expand1 <- c(punctuation_words_num_replace[,"WORD"],contractions_shortened_words_expand1[,1])
+#all_words_expand1 <- c(punctuation_data[,"WORD"],contractions_shortened_words_expand1[,1])
 #all_words_expand1 <- as.data.frame(all_words_expand1,stringsAsFactors=FALSE)
 #colnames(all_words_expand1) <- "WORD"
 
-#all_words <- rbindlist(l=list(expand_patterns(punctuation_words_num_replace),contractions_shortened_words_expand1), use.names=TRUE, fill=FALSE)
-all_words <- rbindlist(l=list(punctuation_words_num_replace,contractions_shortened_words_expand1), use.names=TRUE, fill=FALSE)
+#all_words <- rbindlist(l=list(expand_patterns(punctuation_data),contractions_shortened_words_expand1), use.names=TRUE, fill=FALSE)
+all_words <- rbindlist(l=list(punctuation_data,contractions_shortened_words_expand1), use.names=TRUE, fill=FALSE)
 all_words <- as.data.frame(all_words,stringsAsFactors=FALSE)
 
 
@@ -898,10 +999,12 @@ row.names(punct_expand_space) <- seq(nrow(punct_expand_space))
 punct_expand_full <- punct_expand_space
 
 rm(all_words,all_words_expand1,all_words_expand2)
-rm(punctuation_words_ordinal_replace,punctuation_words_num_replace)
-rm(contractions_shortened_words_expand1)
+rm(punctuation_data,contractions_shortened_words_expand1)
 rm(punct_expand_blanks0,punct_expand_blanks)
 rm(punct_expand_space0,punct_expand_space)
+rm(punctuation_words_bracket_replace,punctuation_words_ordinal_replace,punctuation_words_num_replace)
+rm(punctuation_words_contraction_replace,punctuation_words_abbreviation_replace,punctuation_words_symbol_replace,punctuation_words_scrub)
+rm(punctuation_words1_df_expand_pad)
 
 
 ###############################################################################
@@ -980,6 +1083,7 @@ punct_sub_shortened_expand <- expand_patterns(punct_sub_shortened)
 #punct_sub_shortened_expand[,c("REPLACEMENT")] <- gsub("^\\s+|\\s+$", "", punct_sub_shortened_expand[,c("REPLACEMENT")])
 
 punct_sub_shortened_expand <- unique(punct_sub_shortened_expand)
+#punct_sub_shortened_expand <- punct_sub_shortened_expand[order(punct_sub_shortened_expand[,"PATTERN"],punct_sub_shortened_expand[,"REPLACEMENT"]),]
 punct_sub_shortened_expand <- punct_sub_shortened_expand[order(punct_sub_shortened_expand[,"REPLACEMENT"],punct_sub_shortened_expand[,"PATTERN"]),]
 row.names(punct_sub_shortened_expand) <- seq(nrow(punct_sub_shortened_expand))
 
@@ -991,136 +1095,369 @@ rm(punct_sub_shortened0,punct_sub_shortened_dt,punct_sub_shortened,punct_sub_sho
 
 
 ###############################################################################
-cat("Create final hash table \n")
+cat("Create hash table pattern \n")
 ###############################################################################
-
-hash_table0 <- expand_patterns(punct_sub_full)
-
-hash_table1 <- hash_table0
-
-words <- c(punctuation_words1_df_expand[,"REPLACEMENT"],contractions1[,"REPLACEMENT"],shortened_words1[,"REPLACEMENT"])
-words_u <- unique(words)
 
 hash_pattern_trim0 <- punct_u_trim
 hash_pattern_trim1 <- hash_pattern_trim0[hash_pattern_trim0!="-"]
 hash_pattern_trim2 <- hash_pattern_trim1[hash_pattern_trim1!=" "]
-hash_pattern0 <- paste(hash_pattern_trim2,collapse="")
+hash_pattern_trim3 <- hash_pattern_trim2[hash_pattern_trim2!="'"]
+hash_pattern0 <- paste(hash_pattern_trim3,collapse="")
 hash_pattern <- paste("[",hash_pattern0,"]",sep="")
 
-hash_table1[,c("PATTERN")] <- gsub(" {2,}", " ",hash_table1[,c("PATTERN")])
-hash_table1[,c("PATTERN")] <- gsub("^\\s+|\\s+$", "", hash_table1[,c("PATTERN")])
 
-hash_table1[,c("REPLACEMENT")] <- gsub(" {2,}", " ",hash_table1[,c("REPLACEMENT")])
-hash_table1[,c("REPLACEMENT")] <- gsub("^\\s+|\\s+$", "", hash_table1[,c("REPLACEMENT")])
+###############################################################################
+cat("Create small hash table \n")
+###############################################################################
 
-hash_table1 <- hash_table1[hash_table1[,c("REPLACEMENT")] %in% words_u,]
-
-hash_table1[,c("REPLACEMENT")] <- gsub(hash_pattern, "",hash_table1[,c("REPLACEMENT")])
-#hash_table1[,c("REPLACEMENT")] <- gsub("[[:punct:]]", "",hash_table1[,c("REPLACEMENT")])
-#hash_table1[,c("REPLACEMENT")] <- gsub(" ", "",hash_table1[,c("REPLACEMENT")])
+hash_table_small1 <- rbindlist(l=list(ordinal_lookup1,abbreviations1_expand,contractions1,shortened_words1), use.names=TRUE, fill=FALSE)
+hash_table_small1 <- as.data.frame(hash_table_small1,stringsAsFactors=FALSE)
 
 
-#hash_table1 <- hash_table1[order(hash_table1[,"REPLACEMENT"],hash_table1[,"PATTERN"]),]
-hash_table1 <- hash_table1[order(hash_table1[,"PATTERN"],hash_table1[,"REPLACEMENT"]),]
-hash_table1 <- hash_table1[(hash_table1[,"REPLACEMENT"] != hash_table1[,"PATTERN"]),]
-hash_table1 <- unique(hash_table1)
-row.names(hash_table1) <- seq(nrow(hash_table1))
+###############################################################################
+cat("Create large hash table \n")
+###############################################################################
+
+hash_table_large0 <- expand_patterns(punct_sub_full)
+hash_table_large0 <- as.data.frame(hash_table_large0,stringsAsFactors=FALSE)
+
+hash_table_large1 <- rbindlist(l=list(hash_table_large0,hash_table_small1), use.names=TRUE, fill=FALSE)
+hash_table_large1 <- as.data.frame(hash_table_large1,stringsAsFactors=FALSE)
+
+#words <- c(punctuation_words1_df_expand[,"REPLACEMENT"],contractions1[,"REPLACEMENT"],shortened_words1[,"REPLACEMENT"])
+#words_u <- unique(words)
 
 
-#### TEST ####
-hash_table1_count <- ddply(.data=hash_table1, .variables="PATTERN", .fun = function(x){
+###############################################################################
+cat("Trim hash tables \n")
+###############################################################################
+
+#Small Hash Table
+
+hash_table_small1[,c("PATTERN")] <- gsub(" {2,}", " ",hash_table_small1[,c("PATTERN")])
+hash_table_small1[,c("PATTERN")] <- gsub("^\\s+|\\s+$", "", hash_table_small1[,c("PATTERN")])
+
+hash_table_small1[,c("REPLACEMENT")] <- gsub(" {2,}", " ",hash_table_small1[,c("REPLACEMENT")])
+hash_table_small1[,c("REPLACEMENT")] <- gsub("^\\s+|\\s+$", "", hash_table_small1[,c("REPLACEMENT")])
+
+hash_table_small1[,c("REPLACEMENT")] <- gsub(hash_pattern, "",hash_table_small1[,c("REPLACEMENT")])
+#hash_table_small1[,c("REPLACEMENT")] <- gsub("[[:punct:]]", "",hash_table_small1[,c("REPLACEMENT")])
+#hash_table_small1[,c("REPLACEMENT")] <- gsub(" ", "",hash_table_small1[,c("REPLACEMENT")])
+
+
+#hash_table_small1 <- hash_table_small1[order(hash_table_small1[,"REPLACEMENT"],hash_table_small1[,"PATTERN"]),]
+hash_table_small1 <- hash_table_small1[order(hash_table_small1[,"PATTERN"],hash_table_small1[,"REPLACEMENT"]),]
+hash_table_small1 <- unique(hash_table_small1)
+row.names(hash_table_small1) <- seq(nrow(hash_table_small1))
+
+hash_table_small2 <- expand_patterns(hash_table_small1)
+hash_table_small2 <- as.data.frame(hash_table_small2,stringsAsFactors=FALSE)
+hash_table_small2 <- hash_table_small2[order(hash_table_small2[,"PATTERN"],hash_table_small2[,"REPLACEMENT"]),]
+#hash_table_small2 <- hash_table_small2[(hash_table_small2[,"REPLACEMENT"] != hash_table_small2[,"PATTERN"]),]
+hash_table_small2 <- unique(hash_table_small2)
+row.names(hash_table_small2) <- seq(nrow(hash_table_small2))
+
+
+#Large Hash Table
+
+hash_table_large1[,c("PATTERN")] <- gsub(" {2,}", " ",hash_table_large1[,c("PATTERN")])
+hash_table_large1[,c("PATTERN")] <- gsub("^\\s+|\\s+$", "", hash_table_large1[,c("PATTERN")])
+
+hash_table_large1[,c("REPLACEMENT")] <- gsub(" {2,}", " ",hash_table_large1[,c("REPLACEMENT")])
+hash_table_large1[,c("REPLACEMENT")] <- gsub("^\\s+|\\s+$", "", hash_table_large1[,c("REPLACEMENT")])
+
+hash_table_large1[,c("REPLACEMENT")] <- gsub(hash_pattern, "",hash_table_large1[,c("REPLACEMENT")])
+#hash_table_large1[,c("REPLACEMENT")] <- gsub("[[:punct:]]", "",hash_table_large1[,c("REPLACEMENT")])
+#hash_table_large1[,c("REPLACEMENT")] <- gsub(" ", "",hash_table_large1[,c("REPLACEMENT")])
+
+
+#hash_table_large1 <- hash_table_large1[order(hash_table_large1[,"REPLACEMENT"],hash_table_large1[,"PATTERN"]),]
+hash_table_large1 <- hash_table_large1[order(hash_table_large1[,"PATTERN"],hash_table_large1[,"REPLACEMENT"]),]
+hash_table_large1 <- unique(hash_table_large1)
+row.names(hash_table_large1) <- seq(nrow(hash_table_large1))
+
+hash_table_large2 <- expand_patterns(hash_table_large1)
+hash_table_large2 <- as.data.frame(hash_table_large2,stringsAsFactors=FALSE)
+hash_table_large2 <- hash_table_large2[order(hash_table_large2[,"PATTERN"],hash_table_large2[,"REPLACEMENT"]),]
+#hash_table_large2 <- hash_table_large2[(hash_table_large2[,"REPLACEMENT"] != hash_table_large2[,"PATTERN"]),]
+hash_table_large2 <- unique(hash_table_large2)
+row.names(hash_table_large2) <- seq(nrow(hash_table_large2))
+
+
+###############################################################################
+cat("Remove hash tables spaces \n")
+###############################################################################
+
+#Small Hash Table
+
+hash_table_small3 <- hash_table_small2
+hash_table_small3[,c("REPLACEMENT")] <- gsub(" ", "",hash_table_small3[,c("REPLACEMENT")])
+hash_table_small3 <- unique(hash_table_small3)
+row.names(hash_table_small3) <- seq(nrow(hash_table_small3))
+
+hash_table_small4 <- expand_patterns(hash_table_small3)
+hash_table_small4 <- as.data.frame(hash_table_small4,stringsAsFactors=FALSE)
+hash_table_small4 <- hash_table_small4[order(hash_table_small4[,"PATTERN"],hash_table_small4[,"REPLACEMENT"]),]
+#hash_table_small4 <- hash_table_small4[(hash_table_small4[,"REPLACEMENT"] != hash_table_small4[,"PATTERN"]),]
+hash_table_small4 <- unique(hash_table_small4)
+row.names(hash_table_small4) <- seq(nrow(hash_table_small4))
+
+
+#Large Hash Table
+
+hash_table_large3 <- hash_table_large2
+hash_table_large3[,c("REPLACEMENT")] <- gsub(" ", "",hash_table_large3[,c("REPLACEMENT")])
+hash_table_large3 <- unique(hash_table_large3)
+row.names(hash_table_large3) <- seq(nrow(hash_table_large3))
+
+hash_table_large4 <- expand_patterns(hash_table_large3)
+hash_table_large4 <- as.data.frame(hash_table_large4,stringsAsFactors=FALSE)
+hash_table_large4 <- hash_table_large4[order(hash_table_large4[,"PATTERN"],hash_table_large4[,"REPLACEMENT"]),]
+#hash_table_large4 <- hash_table_large4[(hash_table_large4[,"REPLACEMENT"] != hash_table_large4[,"PATTERN"]),]
+hash_table_large4 <- unique(hash_table_large4)
+row.names(hash_table_large4) <- seq(nrow(hash_table_large4))
+
+
+###############################################################################
+cat("Remove hash tables punctuation \n")
+###############################################################################
+
+#Small Hash Table
+
+hash_table_small5 <- hash_table_small4
+hash_table_small5[,c("REPLACEMENT")] <- gsub("-", "",hash_table_small5[,c("REPLACEMENT")])
+hash_table_small5[,c("REPLACEMENT")] <- gsub("'", "",hash_table_small5[,c("REPLACEMENT")])
+hash_table_small5 <- unique(hash_table_small5)
+row.names(hash_table_small5) <- seq(nrow(hash_table_small5))
+
+hash_table_small6 <- expand_patterns(hash_table_small5)
+hash_table_small6 <- as.data.frame(hash_table_small6,stringsAsFactors=FALSE)
+hash_table_small6 <- hash_table_small6[order(hash_table_small6[,"PATTERN"],hash_table_small6[,"REPLACEMENT"]),]
+#hash_table_small6 <- hash_table_small6[(hash_table_small6[,"REPLACEMENT"] != hash_table_small6[,"PATTERN"]),]
+hash_table_small6 <- unique(hash_table_small6)
+row.names(hash_table_small6) <- seq(nrow(hash_table_small6))
+
+
+#Large Hash Table
+
+hash_table_large5 <- hash_table_large4
+hash_table_large5[,c("REPLACEMENT")] <- gsub("-", "",hash_table_large5[,c("REPLACEMENT")])
+hash_table_large5[,c("REPLACEMENT")] <- gsub("'", "",hash_table_large5[,c("REPLACEMENT")])
+hash_table_large5 <- unique(hash_table_large5)
+row.names(hash_table_large5) <- seq(nrow(hash_table_large5))
+
+hash_table_large6 <- expand_patterns(hash_table_large5)
+hash_table_large6 <- as.data.frame(hash_table_large6,stringsAsFactors=FALSE)
+hash_table_large6 <- hash_table_large6[order(hash_table_large6[,"PATTERN"],hash_table_large6[,"REPLACEMENT"]),]
+#hash_table_large6 <- hash_table_large6[(hash_table_large6[,"REPLACEMENT"] != hash_table_large6[,"PATTERN"]),]
+hash_table_large6 <- unique(hash_table_large6)
+row.names(hash_table_large6) <- seq(nrow(hash_table_large6))
+
+
+###############################################################################
+cat("Remove equal pattern and replacements in hash tables \n")
+###############################################################################
+
+#Small Hash Table
+
+hash_table_small7 <- hash_table_small6
+hash_table_small7 <- hash_table_small7[(hash_table_small7[,"REPLACEMENT"] != hash_table_small7[,"PATTERN"]),]
+hash_table_small7 <- unique(hash_table_small7)
+row.names(hash_table_small7) <- seq(nrow(hash_table_small7))
+
+hash_table_full_small <- hash_table_small7
+
+
+#Large Hash Table
+
+hash_table_large7 <- hash_table_large6
+hash_table_large7 <- hash_table_large7[(hash_table_large7[,"REPLACEMENT"] != hash_table_large7[,"PATTERN"]),]
+hash_table_large7 <- unique(hash_table_large7)
+row.names(hash_table_large7) <- seq(nrow(hash_table_large7))
+
+hash_table_full_large <- hash_table_large7
+
+
+###############################################################################
+cat("Get hash tables counts \n")
+###############################################################################
+
+#Small Hash Table
+
+hash_table_count_small <- ddply(.data=hash_table_full_small, .variables="PATTERN", .fun = function(x){
   x_count <- data.frame(x,count=nrow(x),stringsAsFactors=FALSE)
   return(x_count)
 }, .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
-hash_table1_count <- hash_table1_count[order(-hash_table1_count[,"count"],hash_table1_count[,"PATTERN"],hash_table1_count[,"REPLACEMENT"]),]
-rm(hash_table1_count)
 
-#### END TEST ####
+hash_table_count_small <- hash_table_count_small[order(-hash_table_count_small[,"count"],hash_table_count_small[,"PATTERN"],hash_table_count_small[,"REPLACEMENT"]),]
 
-hash_table <- ddply(.data=hash_table1, .variables="PATTERN", .fun = function(x){
+
+#Large Hash Table
+
+hash_table_count_large <- ddply(.data=hash_table_full_large, .variables="PATTERN", .fun = function(x){
+  x_count <- data.frame(x,count=nrow(x),stringsAsFactors=FALSE)
+  return(x_count)
+}, .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+
+hash_table_count_large <- hash_table_count_large[order(-hash_table_count_large[,"count"],hash_table_count_large[,"PATTERN"],hash_table_count_large[,"REPLACEMENT"]),]
+
+
+###############################################################################
+cat("Only keep one pattern per replacement \n")
+###############################################################################
+
+#Small Hash Table
+
+hash_table_final_small0 <- ddply(.data=hash_table_full_small, .variables="PATTERN", .fun = function(x){
   
-  # x <- hash_table1[hash_table1[,"PATTERN"]=="GOTTA",]
+  # x <- hash_table_full_small[hash_table_full_small[,"PATTERN"]=="12B-1",]
   
-  x_trim0 <- data.frame(x,len=nchar(x[,"REPLACEMENT"]),stringsAsFactors=FALSE)
-  x_trim1 <- x_trim0[x_trim0[,"len"]==min(x_trim0[,"len"]),]
-  x_trim2 <- x_trim1[,!(colnames(x_trim1) %in% c("len"))]
+  x_trim0 <- data.frame(x,LEN=nchar(x[,"REPLACEMENT"]),stringsAsFactors=FALSE)
+  x_trim0 <- x_trim0[order(x_trim0[,"PATTERN"],x_trim0[,"LEN"]),]
+  #  x_trim1 <- x_trim0[x_trim0[,"LEN"]==min(x_trim0[,"LEN"]),]
+  x_trim1 <- x_trim0[x_trim0[,"LEN"]==max(x_trim0[,"LEN"]),]
+  x_trim2 <- x_trim1[,!(colnames(x_trim1) %in% c("LEN"))]
   
   x_trim <- tail(x_trim2,1)
   
   return(x_trim)
 }, .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
 
-#hash_table <- hash_table[order(hash_table[,"PATTERN"],hash_table[,"REPLACEMENT"]),]
-hash_table <- hash_table[order(hash_table[,"REPLACEMENT"],hash_table[,"PATTERN"]),]
-row.names(hash_table) <- seq(nrow(hash_table))
+#hash_table_final_small0 <- hash_table_final_small0[order(hash_table_final_small0[,"PATTERN"],hash_table_final_small0[,"REPLACEMENT"]),]
+hash_table_final_small0 <- hash_table_final_small0[order(hash_table_final_small0[,"REPLACEMENT"],hash_table_final_small0[,"PATTERN"]),]
+row.names(hash_table_final_small0) <- seq(nrow(hash_table_final_small0))
 
-hash_table_final <- hash_table
+hash_table_final_small <- hash_table_final_small0
+
+
+#Large Hash Table
+
+hash_table_final_large0 <- ddply(.data=hash_table_full_large, .variables="PATTERN", .fun = function(x){
+  
+  # x <- hash_table_full_large[hash_table_full_large[,"PATTERN"]=="12B-1",]
+  
+  x_trim0 <- data.frame(x,LEN=nchar(x[,"REPLACEMENT"]),stringsAsFactors=FALSE)
+  x_trim0 <- x_trim0[order(x_trim0[,"PATTERN"],x_trim0[,"LEN"]),]
+  #  x_trim1 <- x_trim0[x_trim0[,"LEN"]==min(x_trim0[,"LEN"]),]
+  x_trim1 <- x_trim0[x_trim0[,"LEN"]==max(x_trim0[,"LEN"]),]
+  x_trim2 <- x_trim1[,!(colnames(x_trim1) %in% c("LEN"))]
+  
+  x_trim <- tail(x_trim2,1)
+  
+  return(x_trim)
+}, .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+
+#hash_table_final_large0 <- hash_table_final_large0[order(hash_table_final_large0[,"PATTERN"],hash_table_final_large0[,"REPLACEMENT"]),]
+hash_table_final_large0 <- hash_table_final_large0[order(hash_table_final_large0[,"REPLACEMENT"],hash_table_final_large0[,"PATTERN"]),]
+row.names(hash_table_final_large0) <- seq(nrow(hash_table_final_large0))
+
+hash_table_final_large <- hash_table_final_large0
+
+
+###############################################################################
+cat("Add backslahses so that hashes can be used in gsub function \n")
+###############################################################################
 
 eres <- c("\\.","\\\\","\\|","\\(","\\)","\\[","\\{","\\^","\\$","\\*","\\+","\\?")
 
+#Small Hash Table
+
 for(k in 1:length(eres))
 {
-  #hash_table_final[,"PATTERN"] <- gsub("\\(","\\\\(",hash_table_final[,"PATTERN"])
+  #hash_table_final_small[,"PATTERN"] <- gsub("\\(","\\\\(",hash_table_final_small[,"PATTERN"])
   
-  hash_table_final[,"PATTERN"] <- gsub(eres[k],paste("\\",eres[k],sep=""),hash_table_final[,"PATTERN"])
-  hash_table_final[,"REPLACEMENT"] <- gsub(eres[k],paste("\\",eres[k],sep=""),hash_table_final[,"REPLACEMENT"])
+  hash_table_final_small[,"PATTERN"] <- gsub(eres[k],paste("\\",eres[k],sep=""),hash_table_final_small[,"PATTERN"])
+  hash_table_final_small[,"REPLACEMENT"] <- gsub(eres[k],paste("\\",eres[k],sep=""),hash_table_final_small[,"REPLACEMENT"])
 }
-rm(eres,k)
+rm(k)
 
-hash_table_final[,c("PATTERN")] <- paste(" ",hash_table_final[,c("PATTERN")]," ",sep="")
-hash_table_final[,c("REPLACEMENT")] <- paste(" ",hash_table_final[,c("REPLACEMENT")]," ",sep="")
+hash_table_final_small[,c("PATTERN")] <- paste(" ",hash_table_final_small[,c("PATTERN")]," ",sep="")
+hash_table_final_small[,c("REPLACEMENT")] <- paste(" ",hash_table_final_small[,c("REPLACEMENT")]," ",sep="")
 
+
+#Large Hash Table
+
+for(k in 1:length(eres))
+{
+  #hash_table_final_large[,"PATTERN"] <- gsub("\\(","\\\\(",hash_table_final_large[,"PATTERN"])
+  
+  hash_table_final_large[,"PATTERN"] <- gsub(eres[k],paste("\\",eres[k],sep=""),hash_table_final_large[,"PATTERN"])
+  hash_table_final_large[,"REPLACEMENT"] <- gsub(eres[k],paste("\\",eres[k],sep=""),hash_table_final_large[,"REPLACEMENT"])
+}
+rm(k)
+
+hash_table_final_large[,c("PATTERN")] <- paste(" ",hash_table_final_large[,c("PATTERN")]," ",sep="")
+hash_table_final_large[,c("REPLACEMENT")] <- paste(" ",hash_table_final_large[,c("REPLACEMENT")]," ",sep="")
+
+rm(eres)
 rm(contractions,contractions1)
 rm(shortened_words,shortened_words1)
+rm(ordinal_lookup,ordinal_lookup1)
+rm(abbreviations,abbreviations1,abbreviations1_expand)
 rm(punctuation_words,punctuation_words1,punctuation_words1_df_expand,punct_u_expand_trim3)
-rm(punct_sub_full,words,words_u)
-rm(punct_u4,punct_u_trim0,punct_u_trim)
-rm(hash_pattern_trim0,hash_pattern_trim1,hash_pattern_trim2,hash_pattern0,hash_pattern)
-rm(hash_table0,hash_table1)
+rm(punct_sub_full,punct_u4,punct_u_trim0,punct_u_trim)
+rm(hash_pattern_trim0,hash_pattern_trim1,hash_pattern_trim2,hash_pattern0)
+rm(hash_table_small1,hash_table_small2,hash_table_small3)
+rm(hash_table_small4,hash_table_small5,hash_table_small6,hash_table_small7)
+rm(hash_table_large0,hash_table_large1,hash_table_large2,hash_table_large3)
+rm(hash_table_large4,hash_table_large5,hash_table_large6,hash_table_large7)
+rm(hash_table_count_small,hash_table_count_large)
+rm(hash_table_final_small0,hash_table_final_large0)
 
 
 ###############################################################################
-cat("Import External Text Data \n")
+cat("Output Hash Tables \n")
 ###############################################################################
 
-#letter_beginning0 <- read.csv(file=paste(input_directory,"letter_beginning.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-letter_beginning0 <- read.table(file=paste(input_directory,"letter_beginning.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-letter_ending0 <- read.table(file=paste(input_directory,"letter_ending.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-letter_position0 <- read.table(file=paste(input_directory,"letter_position.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-letter_signature0 <- read.table(file=paste(input_directory,"letter_signature.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
-letter_closing0 <- read.table(file=paste(input_directory,"letter_closing.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+write.table(hash_table_final_small,file=paste(input_directory,"\\","hash_table_final_small",".csv",sep=""), append=FALSE, na="NA", 
+            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+
+write.table(hash_table_final_large,file=paste(input_directory,"\\","hash_table_final_large",".csv",sep=""), append=FALSE, na="NA", 
+            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+
 
 ###############################################################################
 cat("Substitute External Text Data \n")
 ###############################################################################
 
-letter_beginning0[,c("BEGINNINGS")] <- paste(" ",letter_beginning0[,c("BEGINNINGS")]," ",sep="")
-letter_beginning0[,c("BEGINNINGS")] <- gsub("([[:punct:]])"," \\1 ",letter_beginning0[,c("BEGINNINGS")])
-letter_beginning0_dt <- data.table(letter_beginning0)
+letter_beginning0_dt <-letter_beginning0
+letter_beginning0_dt[,c("BEGINNINGS")] <- paste(" ",letter_beginning0_dt[,c("BEGINNINGS")]," ",sep="")
+letter_beginning0_dt[,c("BEGINNINGS")] <- gsub(hash_pattern," \\1 ",letter_beginning0_dt[,c("BEGINNINGS")])
+letter_beginning0_dt <- data.table(letter_beginning0_dt)
 
-letter_ending0[,c("ENDINGS")] <- paste(" ",letter_ending0[,c("ENDINGS")]," ",sep="")
-letter_ending0[,c("ENDINGS")] <- gsub("([[:punct:]])"," \\1 ",letter_ending0[,c("ENDINGS")])
-letter_ending0_dt <- data.table(letter_ending0)
+letter_ending0_dt <-letter_ending0
+letter_ending0_dt[,c("ENDINGS")] <- paste(" ",letter_ending0_dt[,c("ENDINGS")]," ",sep="")
+letter_ending0_dt[,c("ENDINGS")] <- gsub(hash_pattern," \\1 ",letter_ending0_dt[,c("ENDINGS")])
+letter_ending0_dt <- data.table(letter_ending0_dt)
 
-letter_position0[,c("POSITIONS")] <- paste(" ",letter_position0[,c("POSITIONS")]," ",sep="")
-letter_position0[,c("POSITIONS")] <- gsub("([[:punct:]])"," \\1 ",letter_position0[,c("POSITIONS")])
-letter_position0_dt <- data.table(letter_position0)
+letter_position0_dt <-letter_position0
+letter_position0_dt[,c("POSITIONS")] <- paste(" ",letter_position0_dt[,c("POSITIONS")]," ",sep="")
+letter_position0_dt[,c("POSITIONS")] <- gsub(hash_pattern," \\1 ",letter_position0_dt[,c("POSITIONS")])
+letter_position0_dt <- data.table(letter_position0_dt)
 
-letter_signature0[,c("SIGNATURES")] <- paste(" ",letter_signature0[,c("SIGNATURES")]," ",sep="")
-letter_signature0[,c("SIGNATURES")] <- gsub("([[:punct:]])"," \\1 ",letter_signature0[,c("SIGNATURES")])
-letter_signature0_dt <- data.table(letter_signature0)
+letter_signature0_dt <-letter_signature0
+letter_signature0_dt[,c("SIGNATURES")] <- paste(" ",letter_signature0_dt[,c("SIGNATURES")]," ",sep="")
+letter_signature0_dt[,c("SIGNATURES")] <- gsub(hash_pattern," \\1 ",letter_signature0_dt[,c("SIGNATURES")])
+letter_signature0_dt <- data.table(letter_signature0_dt)
 
-letter_closing0[,c("CLOSINGS")] <- paste(" ",letter_closing0[,c("CLOSINGS")]," ",sep="")
-letter_closing0[,c("CLOSINGS")] <- gsub("([[:punct:]])"," \\1 ",letter_closing0[,c("CLOSINGS")])
-letter_closing0_dt <- data.table(letter_closing0)
-
+letter_closing0_dt <-letter_closing0
+letter_closing0_dt[,c("CLOSINGS")] <- paste(" ",letter_closing0_dt[,c("CLOSINGS")]," ",sep="")
+letter_closing0_dt[,c("CLOSINGS")] <- gsub(hash_pattern," \\1 ",letter_closing0_dt[,c("CLOSINGS")])
+letter_closing0_dt <- data.table(letter_closing0_dt)
 
 #rm(letter_beginning0,letter_ending0,letter_position0,letter_signature0,letter_closing0)
+
+hash_table_full <-hash_table_full_small
+hash_table_final <- hash_table_final_small
+
+#hash_table_full <-hash_table_full_large
+#hash_table_final <- hash_table_final_large
 
 for(k in 1:nrow(hash_table_final))
 {
   # k <- 1
   # k <- 254
+  # k <- 10038
 
   set(letter_beginning0_dt, i=NULL, j="BEGINNINGS", value=gsub(hash_table_final[k,c("PATTERN")], hash_table_final[k,c("REPLACEMENT")], letter_beginning0_dt[["BEGINNINGS"]]))
   set(letter_ending0_dt, i=NULL, j="ENDINGS", value=gsub(hash_table_final[k,c("PATTERN")], hash_table_final[k,c("REPLACEMENT")], letter_ending0_dt[["ENDINGS"]]))
@@ -1132,33 +1469,75 @@ for(k in 1:nrow(hash_table_final))
 }
 #rm(hash_table_final,k)
 
+  
 letter_beginning1 <- as.data.frame(letter_beginning0_dt,stringsAsFactors=FALSE)
 letter_ending1 <- as.data.frame(letter_ending0_dt,stringsAsFactors=FALSE)
 letter_position1 <- as.data.frame(letter_position0_dt,stringsAsFactors=FALSE)
 letter_signature1 <- as.data.frame(letter_signature0_dt,stringsAsFactors=FALSE)
 letter_closing1 <- as.data.frame(letter_closing0_dt,stringsAsFactors=FALSE)
 
+# for(k in 1:nrow(hash_table_final))
+# {
+#   # k <- 1
+#   # k <- 254
+#   # k <- 10038
+# 
+#   set(letter_beginning0_dt, i=NULL, j="BEGINNINGS", value=gsub(hash_table_final[k,c("REPLACEMENT")], hash_table_final[k,c("PATTERN")], letter_beginning0_dt[["BEGINNINGS"]]))
+#   set(letter_ending0_dt, i=NULL, j="ENDINGS", value=gsub(hash_table_final[k,c("REPLACEMENT")], hash_table_final[k,c("PATTERN")], letter_ending0_dt[["ENDINGS"]]))
+#   set(letter_position0_dt, i=NULL, j="POSITIONS", value=gsub(hash_table_final[k,c("REPLACEMENT")], hash_table_final[k,c("PATTERN")], letter_position0_dt[["POSITIONS"]]))
+#   set(letter_signature0_dt, i=NULL, j="SIGNATURES", value=gsub(hash_table_final[k,c("REPLACEMENT")], hash_table_final[k,c("PATTERN")], letter_signature0_dt[["SIGNATURES"]]))
+#   set(letter_closing0_dt, i=NULL, j="CLOSINGS", value=gsub(hash_table_final[k,c("REPLACEMENT")], hash_table_final[k,c("PATTERN")], letter_closing0_dt[["CLOSINGS"]]))
+#   
+#   #progress_function(k,1,nrow(hash_table_final),1,1,1)
+# }
+# #rm(hash_table_final,k)
+# 
+# letter_beginning1_dt <- letter_beginning0_dt
+# letter_ending1_dt <- letter_ending0_dt
+# letter_position1_dt <- letter_position0_dt
+# letter_signature1_dt <- letter_signature0_dt
+# letter_closing1_dt <- letter_closing0_dt
+#   
+# for(k in 1:nrow(hash_table_final))
+# {
+#   # k <- 1
+#   # k <- 254
+#   # k <- 10038
+#   
+#   set(letter_beginning1_dt, i=NULL, j="BEGINNINGS", value=gsub(hash_table_final[k,c("PATTERN")], hash_table_final[k,c("REPLACEMENT")], letter_beginning1_dt[["BEGINNINGS"]]))
+#   set(letter_ending1_dt, i=NULL, j="ENDINGS", value=gsub(hash_table_final[k,c("PATTERN")], hash_table_final[k,c("REPLACEMENT")], letter_ending1_dt[["ENDINGS"]]))
+#   set(letter_position1_dt, i=NULL, j="POSITIONS", value=gsub(hash_table_final[k,c("PATTERN")], hash_table_final[k,c("REPLACEMENT")], letter_position1_dt[["POSITIONS"]]))
+#   set(letter_signature1_dt, i=NULL, j="SIGNATURES", value=gsub(hash_table_final[k,c("PATTERN")], hash_table_final[k,c("REPLACEMENT")], letter_signature1_dt[["SIGNATURES"]]))
+#   set(letter_closing1_dt, i=NULL, j="CLOSINGS", value=gsub(hash_table_final[k,c("PATTERN")], hash_table_final[k,c("REPLACEMENT")], letter_closing1_dt[["CLOSINGS"]]))
+#   
+#   #progress_function(k,1,nrow(hash_table_final),1,1,1)
+# }
+#   
+# letter_beginning1 <- as.data.frame(letter_beginning1_dt,stringsAsFactors=FALSE)
+# letter_ending1 <- as.data.frame(letter_ending1_dt,stringsAsFactors=FALSE)
+# letter_position1 <- as.data.frame(letter_position1_dt,stringsAsFactors=FALSE)
+# letter_signature1 <- as.data.frame(letter_signature1_dt,stringsAsFactors=FALSE)
+# letter_closing1 <- as.data.frame(letter_closing1_dt,stringsAsFactors=FALSE)
+
 #rm(letter_beginning0_dt,letter_ending0_dt,letter_position0_dt,letter_signature0_dt,letter_closing0_dt)
 
-aa <- adply(.data=hash_table_final, .margins=1, .fun = function(x,data){
-  
-  # x <- hash_table_final[1,]
-  
-  data[,"BEGINNINGS"] <- gsub(x[,"PATTERN"],x["REPLACEMENT"],data[,"BEGINNINGS"])
-  return(data)
-  
-}, data=letter_beginning1, .expand = FALSE, .progress = "text", .inform = FALSE, .parallel = FALSE,.paropts = NULL)
+#aa <- adply(.data=hash_table_final, .margins=1, .fun = function(x,data){
+#
+#  data[,"BEGINNINGS"] <- gsub(x[,"PATTERN"],x["REPLACEMENT"],data[,"BEGINNINGS"])
+#  return(data)
+#  
+#}, data=letter_beginning1, .expand = FALSE, .progress = "text", .inform = FALSE, .parallel = FALSE,.paropts = NULL)
 
 
-bb <- ddply(.data=aa[,], .variables="BEGINNINGS", .fun = function(x){
-  # x <- aa[aa[,"BEGINNINGS"]==" ALL CLIENT ",]
-  
-  p_u <- unique(x[,"PRIORITY"])
-  b_u <- unique(x[,"BEGINNINGS"])
-  
-  x_count <- unique(data.frame(PRIORITY=p_u,BEGINNINGS=b_u,count=nrow(x),stringsAsFactors=FALSE))
-  return(x_count)
-}, .progress = "text",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
+#bb <- ddply(.data=aa[,], .variables="BEGINNINGS", .fun = function(x){
+#
+#  p_u <- unique(x[,"PRIORITY"])
+#  b_u <- unique(x[,"BEGINNINGS"])
+#  
+#  x_count <- unique(data.frame(PRIORITY=p_u,BEGINNINGS=b_u,count=nrow(x),stringsAsFactors=FALSE))
+#  return(x_count)
+#
+#}, .progress = "text",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
 
 
 ###############################################################################
@@ -1190,11 +1569,8 @@ rm(letter_beginning1,letter_ending1,letter_position1,letter_signature1,letter_cl
 
 
 ###############################################################################
-cat("Output Data \n")
+cat("Output Subsitution Data \n")
 ###############################################################################
-
-write.table(hash_table_final,file=paste(input_directory,"\\","hash_table_final",".csv",sep=""), append=FALSE, na="NA", 
-            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
 
 write.table(letter_beginning_final,file=paste(input_directory,"\\","letter_beginning_final",".csv",sep=""), append=FALSE, na="NA", 
             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
@@ -1210,3 +1586,30 @@ write.table(letter_signature_final,file=paste(input_directory,"\\","letter_signa
 
 write.table(letter_closing_final,file=paste(input_directory,"\\","letter_closing_final",".csv",sep=""), append=FALSE, na="NA", 
             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+
+
+###############################################################################
+cat("Update Not Used Words \n")
+###############################################################################
+
+punctuation_words_not_used_orginal <- read.table(file=paste(input_directory,"\\","punctuation_words_not_used",".csv",sep=""), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
+
+punctuation_words_used0 <- expand_patterns(hash_table_full)
+punctuation_words_used0 <- punctuation_words_used0[order(punctuation_words_used0[,"PATTERN"],punctuation_words_used0[,"REPLACEMENT"]),]
+row.names(punctuation_words_used0) <- seq(nrow(punctuation_words_used0))
+
+punctuation_words_used1 <- punctuation_words_used0[,!(colnames(punctuation_words_used0) %in% c("REPLACEMENT"))]
+punctuation_words_used <- unique(punctuation_words_used1)
+
+punctuation_words_used <- as.data.frame(punctuation_words_used,stringsAsFactors=FALSE)
+colnames(punctuation_words_used) <- "WORD"
+
+
+punctuation_words_not_used <- punctuation_words_not_used_orginal[!(punctuation_words_not_used_orginal[,"WORD"] %in% punctuation_words_used[,"WORD"]),]
+punctuation_words_not_used <- unique(punctuation_words_not_used)
+punctuation_words_not_used <- as.data.frame(punctuation_words_not_used,stringsAsFactors=FALSE)
+colnames(punctuation_words_not_used) <- "WORD"
+
+write.table(punctuation_words_not_used,file=paste(input_directory,"\\","punctuation_words_not_used",".csv",sep=""), append=FALSE, na="NA", 
+            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+

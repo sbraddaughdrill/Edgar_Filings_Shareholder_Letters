@@ -1,7 +1,7 @@
 # TODO: Add comment
 # 
 # Author:  Brad
-# File:    Clean_Filings.R
+# File:    Clean_Raw_Filings.R
 # Version: 1.0
 # Date:    06.10.2014
 # Purpose: Clean individual filings

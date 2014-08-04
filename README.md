@@ -6,9 +6,12 @@ Download and Parse Edgar Filings
 A.  Initial Execution Order:
       1. Get_Header_Info.R
       2. Get_Document.R
-      3. Clean_Filings.R
+      3. Clean_Raw_Filings.R
       4. Create_Hash_Tables.R
-      4. Extract_Filings.R
+      5. Substitute_Filings.R
+      6. Extract_Filings.R
+      7. Collapse_Filings.R
+      
       
       
 ***NOTE*** 
