@@ -32,7 +32,7 @@ options(max.print = 500)
 #memory.limit(size = 8183)
 
 # Set location (1=HOME,2=WORK,3=LAPTOP,4=CORALSEA FROM HOME,5=CORALSEA FROM WORK,6=CORALSEA FROM LAPTOP)
-Location <- 1
+Location <- 2
 
 if (Location == 1) {
   #setwd("C:/Research_temp3/")
@@ -158,12 +158,14 @@ regex_section_matches_collapse_old <- function(matches_expand,dv_col,txtid_col) 
 regex_section_matches_expand <- function(regex_strs,data,dv_col,txt_col) {
   
   #  regex_strs <- letter_beginning_regex[letter_beginning_regex[,"REGEX_PRIORITY"]==i,"regex"]
+  #  regex_strs <- regex_temp[,"regex"]
   #  data <- filing_text_letter0
   #  dv_col <- "letter_beginning"
   #  txt_col <- xmltrim_col
   
   #ptm1 <- proc.time()
-  filing_text_letter_id1 <- ldply(.data=regex_strs, .fun = function(x,data,dv_col,txt_col){
+  invisible(gc(verbose = FALSE, reset = TRUE))
+  filing_text_letter_id1_dt <- ldply(.data=regex_strs, .fun = function(x,data,dv_col,txt_col){
     
     #  x <- regex_strs[[1]]
     
@@ -177,7 +179,7 @@ regex_section_matches_expand <- function(regex_strs,data,dv_col,txt_col) {
     
   }, data=data, dv_col=dv_col, txt_col=txt_col)
   
-  filing_text_letter_id1_dt <- data.table(filing_text_letter_id1)
+  filing_text_letter_id1_dt <- data.table(filing_text_letter_id1_dt)
   filing_text_letter_id1 <- unique(filing_text_letter_id1_dt,use.key=FALSE)
   filing_text_letter_id1 <- as.data.frame(filing_text_letter_id1,stringsAsFactors=FALSE)
   
@@ -248,9 +250,9 @@ endqtr <- 4
 #downloadfolder <- "MF_SemiAnnual_Reports"
 #downloadfolder <- "MF_Annual_Reports"
 #downloadfolder <- "MF_Shareholder_Reports_N-CSR"
-#downloadfolder <- "MF_Shareholder_Reports_N-CSR-A"
+downloadfolder <- "MF_Shareholder_Reports_N-CSR-A"
 #downloadfolder <- "MF_Shareholder_Reports_N-CSRS"
-downloadfolder <- "MF_Shareholder_Reports_N-CSRS-A"
+#downloadfolder <- "MF_Shareholder_Reports_N-CSRS-A"
 
 #The sub directory where input filings are
 txtfolder_in <- "txt_substitute"
@@ -534,7 +536,7 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                                                  strs_col="regex", priority_col="REGEX_PRIORITY",stub_beg_col="beg_txt",stub_end_col="end_txt")
                                           rm(letter_beginning_regex0a,letter_beginning_regex0b)
                                           
-                                          cat("STEP 0:","\n")
+                                          #cat("STEP 0:","\n")
                                           
                                           for (i in 1:nrow(letter_beginning_regex0))
                                           {
