@@ -426,7 +426,21 @@ substitute_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                           
                           rm(downloaded_files2)
                           
-                          substitute <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
+                          #Get name of all files already done
+                          completed_files <- data.frame(file=list.files(sub_folder_output_path),stringsAsFactors=FALSE)
+                          
+                          downloaded_files4 <- data.frame(downloaded_files3,already_done=NA,stringsAsFactors=FALSE)
+                          
+                          
+                          downloaded_files4[,"already_done"] <- ifelse(downloaded_files4[,"file"] %in% completed_files[,"file"], 1, 0)
+                          
+                          rm(downloaded_files3,completed_files)
+                          
+                          downloaded_files5 <- downloaded_files4[(downloaded_files4[,"already_done"]==0) ,]
+                          
+                          rm(downloaded_files4)
+                          
+                          substitute <- dlply(.data=downloaded_files5, .variables=c("yr_id"), 
                                               .fun = function(y,sub_folder_output_path,entity_encoding,hash_table){
                                                 
                                                 
@@ -557,7 +571,7 @@ substitute_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                 
                                                 
                                                 #CONVERT TO ASCII ENCODING
-                                                filing_text_letter0_temp[,c(xmltrim_col)] <- iconv(filing_text_letter0_temp[,c(xmltrim_col)], "latin1", "ASCII", sub="")
+                                                filing_text_letter0_temp[,c(xmltrim_col)] <- iconv(filing_text_letter0_temp[,c(xmltrim_col)], "latin1", "ASCII", sub=" ")
                                                 
                                                 
                                                 #REPLACE BRACKETS
@@ -567,6 +581,23 @@ substitute_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                                                 #REPLACE CONTRACTIONS
                                                 #filing_text_letter0_temp[,c(xmltrim_col)] <-  replace_contraction(text.var=filing_text_letter0_temp[,c(xmltrim_col)], contraction = qdapDictionaries::contractions,
                                                 #                                                                  replace = NULL, ignore.case = TRUE, sent.cap = TRUE)        
+                                                
+                                                #FIX NUMBERS THAT ARE TOO LONG FOR replace_number FUNCTION
+                                                cutoff_len <- 19
+                                                pattern <- paste("\\d{",cutoff_len+1,",}",sep="")
+                                                matches <- gregexpr(pattern, filing_text_letter0_temp[,c(xmltrim_col)])
+                                                
+                                                replace_with_spaces <-lapply(regmatches(filing_text_letter0_temp[,c(xmltrim_col)], matches), function(x,cutoff) {
+                                                  
+                                                  mapply(function(x, n, cutoff){formatC(substr(x,1,cutoff), width=-n) }, x=x, n=nchar(x), MoreArgs=list(cutoff=cutoff))
+                                                  
+                                                },cutoff=cutoff_len)
+                                                
+                                                #combine with original values
+                                                filing_text_letter0_temp[,c(xmltrim_col)]<- unlist(Map(function(a,b) paste0(a,c(b,""), collapse=""), 
+                                                                                                       regmatches(filing_text_letter0_temp[,c(xmltrim_col)], matches, invert=T), replace_with_spaces))
+                                                
+                                                rm(cutoff_len,pattern,matches,replace_with_spaces)
                                                 
                                                 #REPLACE NUMBER
                                                 filing_text_letter0_temp[,c(xmltrim_col)] <- replace_number(text.var=filing_text_letter0_temp[,c(xmltrim_col)], num.paste = TRUE)
@@ -684,7 +715,7 @@ substitute_all <- dlply(.data=filings_trim2, .variables=c("yr"),
                           df_comb_list_all <- list(substitute)
                           
                           rm(substitute)
-                          rm(yr,yr_folder_path,sub_folder_path,sub_folder_output_path,downloaded_files3)
+                          rm(yr,yr_folder_path,sub_folder_path,sub_folder_output_path,downloaded_files5)
                           
                           return(df_comb_list_all)
                           
