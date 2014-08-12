@@ -94,15 +94,19 @@ cat("SECTION: FUNCTIONS", "\n")
 source(file=paste(function_directory,"functions_text_parse.R",sep="\\"),echo=FALSE)
 source(file=paste(function_directory,"functions_utilities.R",sep="\\"),echo=FALSE)
 
-regex_execute <- function(data,levels,regex_data,regex_data_o_priority_col,regex_data_r_priority_col,regex_data_str_col,flags_all,flag_local,fileid_col,documentid_col,txtid_col,cum_cols) {
+regex_execute <- function(data,levels,textcol,texttrim_col,regex_data,regex_data_o_priority_col,regex_data_r_priority_col,regex_data_str_col,flags_all,flag_local,fileid_col,documentid_col,txtid_col,cum_cols) {
   
   #  data <- filing_text_letter0
   #  levels <- nrow(letter_beginning_regex0)
+  #  textcol <- xmlcol
+  #  texttrim_col <- xmltrim_col
   #  regex_data <- letter_beginning_regex
   #  flag_local <- "letter_beginning"
   
   #  data <- filing_text_letter1
   #  levels <- nrow(letter_ending_regex0)
+  #  textcol <- xmlcol
+  #  texttrim_col <- xmltrim_col
   #  regex_data <- letter_ending_regex
   #  flag_local <- "letter_ending"
   
@@ -132,10 +136,10 @@ regex_execute <- function(data,levels,regex_data,regex_data_o_priority_col,regex
     #regex_temp <- regex_data[regex_data[,regex_data_r_priority_col]==i,regex_data_str_col]
     
     filing_text_letter_id_temp <- regex_section_matches_expand(regex_strs=regex_data[regex_data[,regex_data_r_priority_col]==i,regex_data_str_col],
-                                                               data=data[,c(doc_txt_id_cols,xmltrim_col,flag_local)],
-                                                               dv_col=flag_local, txt_col=xmltrim_col)
+                                                               data=data[,c(doc_txt_id_cols,texttrim_col,flag_local)],
+                                                               dv_col=flag_local, txt_col=texttrim_col)
     
-    filing_text_letter_id <- merge(data[,c(fileid_col,doc_txt_id_cols,xmlcol,flags_nonlocal,cum_cols)],
+    filing_text_letter_id <- merge(data[,c(fileid_col,doc_txt_id_cols,textcol,flags_nonlocal,cum_cols)],
                                    filing_text_letter_id_temp,
                                    by.x=c(doc_txt_id_cols), by.y=c(doc_txt_id_cols),
                                    all.x=FALSE, all.y=FALSE, sort=FALSE, suffixes=c(".x",".y"))
@@ -143,7 +147,7 @@ regex_execute <- function(data,levels,regex_data,regex_data_o_priority_col,regex
     rm(filing_text_letter_id_temp)
     invisible(gc(verbose = FALSE, reset = TRUE))
     
-    filing_text_letter_id <- filing_text_letter_id[,c(full_id_cols,xmlcol,xmltrim_col,flags_all,cum_cols)]
+    filing_text_letter_id <- filing_text_letter_id[,c(full_id_cols,textcol,texttrim_col,flags_all,cum_cols)]
     
     filing_text_letter_id <- setorderv(data.table(filing_text_letter_id), c(full_id_cols), rep(1,length(full_id_cols)))
     filing_text_letter_id <- as.data.frame(filing_text_letter_id,stringsAsFactors=FALSE)
@@ -152,24 +156,27 @@ regex_execute <- function(data,levels,regex_data,regex_data_o_priority_col,regex
     #row.names(filing_text_letter_id) <- seq(nrow(filing_text_letter_id))
     
     filing_text_letter_matches_local <- filing_text_letter_id[!is.na(filing_text_letter_id[,flag_local]),
-                                                              (colnames(filing_text_letter_id) %in% c(full_id_cols,xmlcol,xmltrim_col,flag_local))]
+                                                              (colnames(filing_text_letter_id) %in% c(full_id_cols,textcol,texttrim_col,flag_local))]
     filing_text_letter_temp <- regex_section_matches_collapse(matches_expand=filing_text_letter_id, dv_col=flag_local, txtid_col=txtid_col)
     
     #rm(regex_temp,filing_text_letter_id)
     rm(filing_text_letter_id)
     invisible(gc(verbose = FALSE, reset = TRUE))
     
+    overall_priority <- unique(regex_data[regex_data[,regex_data_r_priority_col]==i,regex_data_o_priority_col])
+    regex_priority <- i
+    
     if (nrow(filing_text_letter_matches_local)!=0) { filing_text_letter_matches_local <- data.frame(filing_text_letter_matches_local,
-                                                                                                    overall_priority=unique(regex_data[regex_data[,regex_data_r_priority_col]==i,regex_data_o_priority_col]),
-                                                                                                    regex_priority=i,stringsAsFactors=FALSE); break }
-    if (i!=levels) { rm(filing_text_letter_matches_local,filing_text_letter_temp) }
+                                                                                                    overall_priority=overall_priority,
+                                                                                                    regex_priority=regex_priority,stringsAsFactors=FALSE); break }
+    if (i!=levels) { rm(filing_text_letter_temp,filing_text_letter_matches_local,overall_priority,regex_priority) }
     
   }
   #rm(regex_data,data)
   rm(flags_nonlocal,doc_txt_id_cols,full_id_cols,i)
   invisible(gc(verbose = FALSE, reset = TRUE))
 
-  return(list(filing_text_letter_temp,filing_text_letter_matches_local))
+  return(list(filing_text_letter_temp,filing_text_letter_matches_local,overall_priority,regex_priority))
 }
 
 regex_expand <- function(regex_stubs,strs,strs_col,priority_col,stub_beg_col,stub_end_col) {
@@ -553,7 +560,7 @@ rm(letter_beginning,letter_ending,letter_signature,letter_position,letter_closin
 cat("Find Letters \n")
 ###############################################################################
 
-letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x, path_output,subfolder,letter_regex_start,letter_regex_stop){
+letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x, path_output,subfolder,subfolder_output,letter_regex_start,letter_regex_stop){
   
   #  x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
   #  x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
@@ -566,6 +573,7 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
   #  x <- filings_trim2[(filings_trim2[,"yr"]==2011),]
   #  x <- filings_trim2[(filings_trim2[,"yr"]==2012),]
   #  x <- filings_trim2[(filings_trim2[,"yr"]==2013),]
+  
   #  path_output <- paste(output_directory,downloadfolder,sep=slash)
   #  subfolder <- txtfolder_in
   #  subfolder_output <- txtfolder_out
@@ -584,8 +592,8 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
   sub_folder_path <- paste(yr_folder_path, subfolder, sep = "\\", collapse = "\\")   
   create_directory(sub_folder_path,remove=1)
   
-  #sub_folder_output_path <- paste(yr_folder_path, subfolder_output, sep = "\\", collapse = "\\")   
-  #create_directory(sub_folder_output_path,remove=1)
+  sub_folder_output_path <- paste(yr_folder_path, subfolder_output, sep = "\\", collapse = "\\")   
+  create_directory(sub_folder_output_path,remove=1)
   
   #Get name of downloaded files
   downloaded_files <- data.frame(file=list.files(sub_folder_path),stringsAsFactors=FALSE)
@@ -609,7 +617,9 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
   rm(downloaded_files2)
   
   letters <- dlply(.data=downloaded_files3, .variables=c("yr_id"), .fun = function(y,letter_regex_start,letter_regex_stop){
-    
+
+    #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000820027-03-000793.csv"),]
+    #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000949377-03-000772.csv"),]
     
     #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.csv"),]
     #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000088053-03-000790.csv"),]
@@ -756,13 +766,15 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
     letter_beginning_regex0 <- unique(letter_beginning_regex0)
     row.names(letter_beginning_regex0) <- seq(nrow(letter_beginning_regex0))
     
-    filing_text_letter_beg_out <- regex_execute(data=filing_text_letter0,levels=nrow(letter_beginning_regex0),
+    filing_text_letter_beg_out <- regex_execute(data=filing_text_letter0,levels=nrow(letter_beginning_regex0),textcol=xmlcol,texttrim_col=xmltrim_col,
                                                 regex_data=letter_beginning_regex,regex_data_o_priority_col="OVERALL_PRIORITY",regex_data_r_priority_col="REGEX_PRIORITY",regex_data_str_col="regex",
                                                 flags_all=flags,flag_local="letter_beginning",
                                                 fileid_col="file",documentid_col="DOCUMENT_INDEX",txtid_col="text_id",cum_cols=c("beg_cum_sum","end_cum_sum"))
     
     filing_text_letter1 <- filing_text_letter_beg_out[[1]]
     filing_text_letter_matches_beg  <- filing_text_letter_beg_out[[2]]
+    filing_text_letter_o_priority_beg <- filing_text_letter_beg_out[[3]]
+    filing_text_letter_r_priority_beg <- filing_text_letter_beg_out[[4]]
     #i <- unique(filing_text_letter_matches_beg[,"regex_priority"])
     
     rm(letter_beginning_regex0,letter_beginning_regex,filing_text_letter0,filing_text_letter_beg_out)
@@ -776,8 +788,8 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       
       #CREATE MATCH SUMMARIES
       matches_summary0a_h <- data.frame(file=file,type="letter_beginning",
-                                        final_overall_priority=unique(filing_text_letter_matches_beg[,"overall_priority"]),
-                                        final_regex_priority=unique(filing_text_letter_matches_beg[,"regex_priority"]),
+                                        final_overall_priority=filing_text_letter_o_priority_beg,
+                                        final_regex_priority=filing_text_letter_r_priority_beg,
                                         overall_matches=nrow(filing_text_letter_matches_beg),
                                         unique_matches=length(unique(filing_text_letter_matches_beg[,c("text_id")])), stringsAsFactors=FALSE)
       matches_summary0b_h <- data.frame(file=file,type="letter_ending",final_overall_priority=NA,final_regex_priority=NA,overall_matches=NA, unique_matches=NA,stringsAsFactors=FALSE)
@@ -788,9 +800,9 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       filing_text_letter_matches_summary_h <- data.frame(filing_text_letter_matches_summary_h,stringsAsFactors=FALSE)
       rm(matches_summary0a_h,matches_summary0b_h,matches_summary0c_h,matches_summary0d_h,matches_summary0e_h)
       
-      matches_summary0a_v <- data.frame(file=file,type="final_overall_priority",letter_beginning=unique(filing_text_letter_matches_beg[,"overall_priority"]),
+      matches_summary0a_v <- data.frame(file=file,type="final_overall_priority",letter_beginning=filing_text_letter_o_priority_beg,
                                         letter_ending=NA, letter_signature=NA, letter_position=NA,letter_closing=NA, stringsAsFactors=FALSE)
-      matches_summary0b_v <- data.frame(file=file,type="final_regex_priority",letter_beginning=unique(filing_text_letter_matches_beg[,"regex_priority"]),
+      matches_summary0b_v <- data.frame(file=file,type="final_regex_priority",letter_beginning=filing_text_letter_r_priority_beg,
                                         letter_ending=NA, letter_signature=NA, letter_position=NA,letter_closing=NA, stringsAsFactors=FALSE)
       matches_summary0c_v <- data.frame(file=file,type="overall_matches", letter_beginning=nrow(filing_text_letter_matches_beg),
                                         letter_ending=NA,letter_signature=NA,letter_position=NA,letter_closing=NA, stringsAsFactors=FALSE)
@@ -799,6 +811,7 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       filing_text_letter_matches_summary_v <- rbindlist(list(matches_summary0a_v,matches_summary0b_v,matches_summary0c_v,matches_summary0d_v))
       filing_text_letter_matches_summary_v <- data.frame(filing_text_letter_matches_summary_v,stringsAsFactors=FALSE)
       rm(matches_summary0a_v,matches_summary0b_v,matches_summary0c_v,matches_summary0d_v)
+      rm(filing_text_letter_o_priority_beg,filing_text_letter_r_priority_beg)
       #rm(i)
       
       filing_text_letter_matches_end <- filing_text_letter_matches_beg
@@ -842,13 +855,15 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       letter_ending_regex0 <- unique(letter_ending_regex0)
       row.names(letter_ending_regex0) <- seq(nrow(letter_ending_regex0))
       
-      filing_text_letter_end_out <- regex_execute(data=filing_text_letter1,levels=nrow(letter_ending_regex0),
+      filing_text_letter_end_out <- regex_execute(data=filing_text_letter1,levels=nrow(letter_ending_regex0),textcol=xmlcol,texttrim_col=xmltrim_col,
                                                   regex_data=letter_ending_regex,regex_data_o_priority_col="OVERALL_PRIORITY",regex_data_r_priority_col="REGEX_PRIORITY",regex_data_str_col="regex",
                                                   flags_all=flags,flag_local="letter_ending",
                                                   fileid_col="file",documentid_col="DOCUMENT_INDEX",txtid_col="text_id",cum_cols=c("beg_cum_sum","end_cum_sum"))
       
       filing_text_letter2 <- filing_text_letter_end_out[[1]]
       filing_text_letter_matches_end  <- filing_text_letter_end_out[[2]]
+      filing_text_letter_o_priority_end <- filing_text_letter_end_out[[3]]
+      filing_text_letter_r_priority_end <- filing_text_letter_end_out[[4]]
       #j <- unique(filing_text_letter_matches_end[,"regex_priority"])
       
       rm(letter_ending_regex0,letter_ending_regex,filing_text_letter1,filing_text_letter_end_out)
@@ -864,13 +879,15 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       letter_signature_regex0 <- unique(letter_signature_regex0)
       row.names(letter_signature_regex0) <- seq(nrow(letter_signature_regex0))
       
-      filing_text_letter_sign_out <- regex_execute(data=filing_text_letter2,levels=nrow(letter_signature_regex0),
+      filing_text_letter_sign_out <- regex_execute(data=filing_text_letter2,levels=nrow(letter_signature_regex0),textcol=xmlcol,texttrim_col=xmltrim_col,
                                                    regex_data=letter_signature_regex,regex_data_o_priority_col="OVERALL_PRIORITY",regex_data_r_priority_col="REGEX_PRIORITY",regex_data_str_col="regex",
                                                    flags_all=flags,flag_local="letter_signature",
                                                    fileid_col="file",documentid_col="DOCUMENT_INDEX",txtid_col="text_id",cum_cols=c("beg_cum_sum","end_cum_sum"))
       
       filing_text_letter3 <- filing_text_letter_sign_out[[1]]
       filing_text_letter_matches_sign  <- filing_text_letter_sign_out[[2]]
+      filing_text_letter_o_priority_sign <- filing_text_letter_sign_out[[3]]
+      filing_text_letter_r_priority_sign <- filing_text_letter_sign_out[[4]]
       #k <- unique(filing_text_letter_matches_sign[,"regex_priority"])
       
       rm(letter_signature_regex0,letter_signature_regex,filing_text_letter2,filing_text_letter_sign_out)
@@ -887,13 +904,15 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       row.names(letter_position_regex0) <- seq(nrow(letter_position_regex0))
       
       
-      filing_text_letter_pos_out <- regex_execute(data=filing_text_letter3,levels=nrow(letter_position_regex0),
+      filing_text_letter_pos_out <- regex_execute(data=filing_text_letter3,levels=nrow(letter_position_regex0),textcol=xmlcol,texttrim_col=xmltrim_col,
                                                   regex_data=letter_position_regex,regex_data_o_priority_col="OVERALL_PRIORITY",regex_data_r_priority_col="REGEX_PRIORITY",regex_data_str_col="regex",
                                                   flags_all=flags,flag_local="letter_position",
                                                   fileid_col="file",documentid_col="DOCUMENT_INDEX",txtid_col="text_id",cum_cols=c("beg_cum_sum","end_cum_sum"))
       
       filing_text_letter4 <- filing_text_letter_pos_out[[1]]
       filing_text_letter_matches_pos  <- filing_text_letter_pos_out[[2]]
+      filing_text_letter_o_priority_pos <- filing_text_letter_pos_out[[3]]
+      filing_text_letter_r_priority_pos <- filing_text_letter_pos_out[[4]]
       #l <- unique(filing_text_letter_matches_pos[,"regex_priority"])
       
       rm(letter_position_regex0,letter_position_regex,filing_text_letter3,filing_text_letter_pos_out)
@@ -910,46 +929,47 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       letter_closing_regex0 <- unique(letter_closing_regex0)
       row.names(letter_closing_regex0) <- seq(nrow(letter_closing_regex0))
       
-      filing_text_letter_close_out <- regex_execute(data=filing_text_letter4,levels=nrow(letter_closing_regex0),
+      filing_text_letter_close_out <- regex_execute(data=filing_text_letter4,levels=nrow(letter_closing_regex0),textcol=xmlcol,texttrim_col=xmltrim_col,
                                                     regex_data=letter_closing_regex,regex_data_o_priority_col="OVERALL_PRIORITY",regex_data_r_priority_col="REGEX_PRIORITY",regex_data_str_col="regex",
                                                     flags_all=flags,flag_local="letter_closing",
                                                     fileid_col="file",documentid_col="DOCUMENT_INDEX",txtid_col="text_id",cum_cols=c("beg_cum_sum","end_cum_sum"))
       
       filing_text_letter5 <- filing_text_letter_close_out[[1]]
       filing_text_letter_matches_close  <- filing_text_letter_close_out[[2]]
-      #m <- unique(filing_text_letter_matches_close[,"regex_priority"])
-      
+      filing_text_letter_o_priority_close <- filing_text_letter_close_out[[3]]
+      filing_text_letter_r_priority_close <- filing_text_letter_close_out[[4]]
+
       rm(letter_closing_regex0,letter_closing_regex,filing_text_letter4,filing_text_letter_close_out)
       
       
       #CREATE MATCH SUMMARIES
       matches_summary0a_h <- data.frame(file=file,type="letter_beginning",
-                                        final_overall_priority=unique(filing_text_letter_matches_beg[,"overall_priority"]),
-                                        final_regex_priority=unique(filing_text_letter_matches_beg[,"regex_priority"]),
+                                        final_overall_priority=filing_text_letter_o_priority_beg,
+                                        final_regex_priority=filing_text_letter_r_priority_beg,
                                         overall_matches=nrow(filing_text_letter_matches_beg),
                                         unique_matches=length(unique(filing_text_letter_matches_beg[,c("text_id")])),
                                         stringsAsFactors=FALSE)
       matches_summary0b_h <- data.frame(file=file,type="letter_ending",
-                                        final_overall_priority=unique(filing_text_letter_matches_end[,"overall_priority"]),
-                                        final_regex_priority=unique(filing_text_letter_matches_end[,"regex_priority"]),
+                                        final_overall_priority=filing_text_letter_o_priority_end,
+                                        final_regex_priority=filing_text_letter_r_priority_end,
                                         overall_matches=nrow(filing_text_letter_matches_end),
                                         unique_matches=length(unique(filing_text_letter_matches_end[,c("text_id")])),
                                         stringsAsFactors=FALSE)
       matches_summary0c_h <- data.frame(file=file,type="letter_signature",
-                                        final_overall_priority=unique(filing_text_letter_matches_sign[,"overall_priority"]),
-                                        final_regex_priority=unique(filing_text_letter_matches_sign[,"regex_priority"]),
+                                        final_overall_priority=filing_text_letter_o_priority_sign,
+                                        final_regex_priority=filing_text_letter_r_priority_sign,
                                         overall_matches=nrow(filing_text_letter_matches_sign),
                                         unique_matches=length(unique(filing_text_letter_matches_sign[,c("text_id")])),
                                         stringsAsFactors=FALSE)
       matches_summary0d_h <- data.frame(file=file,type="letter_position",
-                                        final_overall_priority=unique(filing_text_letter_matches_pos[,"overall_priority"]),
-                                        final_regex_priority=unique(filing_text_letter_matches_pos[,"regex_priority"]),
+                                        final_overall_priority=filing_text_letter_o_priority_pos,
+                                        final_regex_priority=filing_text_letter_r_priority_pos,
                                         overall_matches=nrow(filing_text_letter_matches_pos),
                                         unique_matches=length(unique(filing_text_letter_matches_pos[,c("text_id")])),
                                         stringsAsFactors=FALSE)
       matches_summary0e_h <- data.frame(file=file,type="letter_closing",
-                                        final_overall_priority=unique(filing_text_letter_matches_close[,"overall_priority"]),
-                                        final_regex_priority=unique(filing_text_letter_matches_close[,"regex_priority"]),
+                                        final_overall_priority=filing_text_letter_o_priority_close,
+                                        final_regex_priority=filing_text_letter_r_priority_close,
                                         overall_matches=nrow(filing_text_letter_matches_close),
                                         unique_matches=length(unique(filing_text_letter_matches_close[,c("text_id")])),
                                         stringsAsFactors=FALSE)
@@ -958,18 +978,18 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       rm(matches_summary0a_h,matches_summary0b_h,matches_summary0c_h,matches_summary0d_h,matches_summary0e_h)
       
       matches_summary0a_v <- data.frame(file=file,type="final_overall_priority",
-                                        letter_beginning=unique(filing_text_letter_matches_beg[,"overall_priority"]),
-                                        letter_ending=unique(filing_text_letter_matches_end[,"overall_priority"]),
-                                        letter_signature=unique(filing_text_letter_matches_sign[,"overall_priority"]),
-                                        letter_position=unique(filing_text_letter_matches_pos[,"overall_priority"]),
-                                        letter_closing=unique(filing_text_letter_matches_close[,"overall_priority"]),
+                                        letter_beginning=filing_text_letter_o_priority_beg,
+                                        letter_ending=filing_text_letter_o_priority_end,
+                                        letter_signature=filing_text_letter_o_priority_sign,
+                                        letter_position=filing_text_letter_o_priority_pos,
+                                        letter_closing=filing_text_letter_o_priority_close,
                                         stringsAsFactors=FALSE)
       matches_summary0b_v <- data.frame(file=file,type="final_regex_priority",
-                                        letter_beginning=unique(filing_text_letter_matches_beg[,"regex_priority"]),
-                                        letter_ending=unique(filing_text_letter_matches_end[,"regex_priority"]),
-                                        letter_signature=unique(filing_text_letter_matches_sign[,"regex_priority"]),
-                                        letter_position=unique(filing_text_letter_matches_pos[,"regex_priority"]),
-                                        letter_closing=unique(filing_text_letter_matches_close[,"regex_priority"]),
+                                        letter_beginning=filing_text_letter_r_priority_beg,
+                                        letter_ending=filing_text_letter_r_priority_end,
+                                        letter_signature=filing_text_letter_r_priority_sign,
+                                        letter_position=filing_text_letter_r_priority_pos,
+                                        letter_closing=filing_text_letter_r_priority_close,
                                         stringsAsFactors=FALSE)
       matches_summary0c_v <- data.frame(file=file,type="overall_matches",
                                         letter_beginning=nrow(filing_text_letter_matches_beg),
@@ -988,6 +1008,11 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
       filing_text_letter_matches_summary_v <- rbindlist(list(matches_summary0a_v,matches_summary0b_v,matches_summary0c_v,matches_summary0d_v))
       filing_text_letter_matches_summary_v <- data.frame(filing_text_letter_matches_summary_v,stringsAsFactors=FALSE)
       rm(matches_summary0a_v,matches_summary0b_v,matches_summary0c_v,matches_summary0d_v)
+      rm(filing_text_letter_o_priority_beg,filing_text_letter_r_priority_beg)
+      rm(filing_text_letter_o_priority_end,filing_text_letter_r_priority_end)
+      rm(filing_text_letter_o_priority_sign,filing_text_letter_r_priority_sign)
+      rm(filing_text_letter_o_priority_pos,filing_text_letter_r_priority_pos)
+      rm(filing_text_letter_o_priority_close,filing_text_letter_r_priority_close)
       #rm(i,j,k,l,m)
       
       
@@ -1149,10 +1174,6 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
   letter_regex_start=letter_regex_start,letter_regex_stop=letter_regex_stop,
   .progress = "none",.inform = FALSE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
   
-  
-  
-  #letters <- bad_tags
-  
   letters_comb0 <- sapply(letters, "[", 1)
   letters_comb1 <- rbindlist(letters_comb0,fill=TRUE,use.names=TRUE)
   #letters_comb  <- as.data.frame(letters_comb1,stringsAsFactors=FALSE) 
@@ -1160,11 +1181,17 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
   letters_comb[,"yr"] <- yr
   rm(letters_comb0,letters_comb1)
   
+  write.table(letters_comb,file=paste(sub_folder_output_path,"\\","letters_comb",".csv",sep=""), append=FALSE, na="NA", 
+              sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+  
   letter_matches_summary0 <- sapply(letters, "[", 2)
   letter_matches_summary1 <- rbindlist(letter_matches_summary0,fill=TRUE,use.names=TRUE)
   letter_matches_summary <- data.frame(yr=NA,letter_matches_summary1,stringsAsFactors=FALSE) 
   letter_matches_summary[,"yr"] <- yr
   rm(letter_matches_summary0,letter_matches_summary1)
+  
+  write.table(letter_matches_summary,file=paste(sub_folder_output_path,"\\","letter_matches_summary",".csv",sep=""), append=FALSE, na="NA", 
+              sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
   
   letter_matches_beg0 <- sapply(letters, "[", 3)
   letter_matches_beg1 <- rbindlist(letter_matches_beg0,fill=TRUE,use.names=TRUE)
@@ -1172,11 +1199,17 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
   letter_matches_beg[,"yr"] <- yr
   rm(letter_matches_beg0,letter_matches_beg1)
   
+  write.table(letter_matches_beg,file=paste(sub_folder_output_path,"\\","letter_matches_beg",".csv",sep=""), append=FALSE, na="NA", 
+              sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+  
   letter_matches_end0 <- sapply(letters, "[", 4)
   letter_matches_end1 <- rbindlist(letter_matches_end0,fill=TRUE,use.names=TRUE)
   letter_matches_end <- data.frame(yr=NA,letter_matches_end1,stringsAsFactors=FALSE) 
   letter_matches_end[,"yr"] <- yr
   rm(letter_matches_end0,letter_matches_end1)
+  
+  write.table(letter_matches_end,file=paste(sub_folder_output_path,"\\","letter_matches_end",".csv",sep=""), append=FALSE, na="NA", 
+              sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
   
   letter_matches_sign0 <- sapply(letters, "[", 5)
   letter_matches_sign1 <- rbindlist(letter_matches_sign0,fill=TRUE,use.names=TRUE)
@@ -1184,11 +1217,17 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
   letter_matches_sign[,"yr"] <- yr
   rm(letter_matches_sign0,letter_matches_sign1)
   
+  write.table(letter_matches_sign,file=paste(sub_folder_output_path,"\\","letter_matches_sign",".csv",sep=""), append=FALSE, na="NA", 
+              sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+  
   letter_matches_pos0 <- sapply(letters, "[", 6)
   letter_matches_pos1 <- rbindlist(letter_matches_pos0,fill=TRUE,use.names=TRUE)
   letter_matches_pos <- data.frame(yr=NA,letter_matches_pos1,stringsAsFactors=FALSE) 
   letter_matches_pos[,"yr"] <- yr
   rm(letter_matches_pos0,letter_matches_pos1)
+  
+  write.table(letter_matches_pos,file=paste(sub_folder_output_path,"\\","letter_matches_pos",".csv",sep=""), append=FALSE, na="NA", 
+              sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
   
   letter_matches_close0 <- sapply(letters, "[", 7)
   letter_matches_close1 <- rbindlist(letter_matches_close0,fill=TRUE,use.names=TRUE)
@@ -1196,78 +1235,86 @@ letters_all <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x
   letter_matches_close[,"yr"] <- yr
   rm(letter_matches_close0,letter_matches_close1)
   
+  write.table(letter_matches_close,file=paste(sub_folder_output_path,"\\","letter_matches_close",".csv",sep=""), append=FALSE, na="NA", 
+              sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+
+
+  letters_yearly <- unique(letters_comb[,c("yr","file","DOCUMENT_INDEX","TYPE","SEQUENCE","FILENAME","DESCRIPTION","LETTER_INDEX")])
+  row.names(letters_yearly) <- seq(nrow(letters_yearly))
   
-  df_comb_list_all <- list(letters_comb,letter_matches_summary,
-                           letter_matches_beg,letter_matches_end,letter_matches_sign,
-                           letter_matches_pos,letter_matches_close)
+  #df_comb_list_all <- list(letters_comb,letter_matches_summary,
+  #                         letter_matches_beg,letter_matches_end,letter_matches_sign,
+  #                         letter_matches_pos,letter_matches_close)
+  
+  df_comb_list_all <- list(letters_yearly)
   
   rm(letters,letters_comb,letter_matches_summary)
   rm(letter_matches_beg,letter_matches_end,letter_matches_sign,letter_matches_pos,letter_matches_close)
-  rm(yr,yr_folder_path,sub_folder_path,downloaded_files3)
+  rm(yr,yr_folder_path,sub_folder_path,sub_folder_output_pathdownloaded_files3)
   
   return(df_comb_list_all)
   
 },
-path_output=paste(output_directory,downloadfolder,sep=slash),subfolder=txtfolder_in,
+path_output=paste(output_directory,downloadfolder,sep=slash),subfolder=txtfolder_in,subfolder_output=txtfolder_out,
 letter_regex_start=letter_regex_start,letter_regex_stop=letter_regex_stop,
 .progress = "text",.inform = TRUE, .drop = TRUE, .parallel = FALSE, .paropts = NULL)
 
 
-###############################################################################
-cat("Seperate Data \n")
-###############################################################################
-
-letter_all_comb0 <- sapply(letters_all, "[", 1)
-letter_all_comb <- rbindlist(letter_all_comb0,fill=TRUE,use.names=TRUE)
-
-letter_all_matches_summary0 <- sapply(letters_all, "[", 2)
-letter_all_matches_summary <- rbindlist(letter_all_matches_summary0,fill=TRUE,use.names=TRUE)
-
-letter_all_matches_beg0 <- sapply(letters_all, "[", 3)
-letter_all_matches_beg <- rbindlist(letter_all_matches_beg0,fill=TRUE,use.names=TRUE)
-
-letter_all_matches_end0 <- sapply(letters_all, "[", 4)
-letter_all_matches_end <- rbindlist(letter_all_matches_end0,fill=TRUE,use.names=TRUE)
-
-letter_all_matches_sign0 <- sapply(letters_all, "[", 5)
-letter_all_matches_sign <- rbindlist(letter_all_matches_sign0,fill=TRUE,use.names=TRUE)
-
-letter_all_matches_pos0 <- sapply(letters_all, "[", 6)
-letter_all_matches_pos <- rbindlist(letter_all_matches_pos0,fill=TRUE,use.names=TRUE)
-
-letter_all_matches_close0 <- sapply(letters_all, "[", 7)
-letter_all_matches_close <- rbindlist(letter_all_matches_close0,fill=TRUE,use.names=TRUE)
-
-#rm(letter_all_comb0,letter_all_matches_summary0)
-#rm(letter_all_matches_beg0,letter_all_matches_end0,letter_all_matches_sign0,letter_all_matches_pos0,letter_all_matches_close0)
-
-
-###############################################################################
-cat("Output Combined Files \n")
-###############################################################################
-
-#Check to see if yr folder exists.  If not, create it.
-out_folder_path <- paste(download_folder_path, txtfolder_out, sep = "\\", collapse = "\\")   
-create_directory(out_folder_path,remove=1)
-
-write.table(letter_all_comb,file=paste(out_folder_path,"\\","letter_all_comb",".csv",sep=""), append=FALSE, na="NA", 
-            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
-
-write.table(letter_all_matches_summary,file=paste(out_folder_path,"\\","letter_all_matches_summary",".csv",sep=""), append=FALSE, na="NA", 
-            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
-
-write.table(letter_all_matches_beg,file=paste(out_folder_path,"\\","letter_all_matches_beg",".csv",sep=""), append=FALSE, na="NA", 
-            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
-
-write.table(letter_all_matches_end,file=paste(out_folder_path,"\\","letter_all_matches_end",".csv",sep=""), append=FALSE, na="NA", 
-            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
-
-write.table(letter_all_matches_sign,file=paste(out_folder_path,"\\","letter_all_matches_sign",".csv",sep=""), append=FALSE, na="NA", 
-            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
-
-write.table(letter_all_matches_pos,file=paste(out_folder_path,"\\","letter_all_matches_pos",".csv",sep=""), append=FALSE, na="NA", 
-            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
-
-write.table(letter_all_matches_close,file=paste(out_folder_path,"\\","letter_all_matches_close",".csv",sep=""), append=FALSE, na="NA", 
-            sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+# ###############################################################################
+# cat("Seperate Data \n")
+# ###############################################################################
+# 
+# letter_all_comb0 <- sapply(letters_all, "[", 1)
+# letter_all_comb <- rbindlist(letter_all_comb0,fill=TRUE,use.names=TRUE)
+# 
+# letter_all_matches_summary0 <- sapply(letters_all, "[", 2)
+# letter_all_matches_summary <- rbindlist(letter_all_matches_summary0,fill=TRUE,use.names=TRUE)
+# 
+# letter_all_matches_beg0 <- sapply(letters_all, "[", 3)
+# letter_all_matches_beg <- rbindlist(letter_all_matches_beg0,fill=TRUE,use.names=TRUE)
+# 
+# letter_all_matches_end0 <- sapply(letters_all, "[", 4)
+# letter_all_matches_end <- rbindlist(letter_all_matches_end0,fill=TRUE,use.names=TRUE)
+# 
+# letter_all_matches_sign0 <- sapply(letters_all, "[", 5)
+# letter_all_matches_sign <- rbindlist(letter_all_matches_sign0,fill=TRUE,use.names=TRUE)
+# 
+# letter_all_matches_pos0 <- sapply(letters_all, "[", 6)
+# letter_all_matches_pos <- rbindlist(letter_all_matches_pos0,fill=TRUE,use.names=TRUE)
+# 
+# letter_all_matches_close0 <- sapply(letters_all, "[", 7)
+# letter_all_matches_close <- rbindlist(letter_all_matches_close0,fill=TRUE,use.names=TRUE)
+# 
+# #rm(letter_all_comb0,letter_all_matches_summary0)
+# #rm(letter_all_matches_beg0,letter_all_matches_end0,letter_all_matches_sign0,letter_all_matches_pos0,letter_all_matches_close0)
+# 
+# 
+# ###############################################################################
+# cat("Output Combined Files \n")
+# ###############################################################################
+# 
+# #Check to see if yr folder exists.  If not, create it.
+# out_folder_path <- paste(download_folder_path, txtfolder_out, sep = "\\", collapse = "\\")   
+# create_directory(out_folder_path,remove=1)
+# 
+# write.table(letter_all_comb,file=paste(out_folder_path,"\\","letter_all_comb",".csv",sep=""), append=FALSE, na="NA", 
+#             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+# 
+# write.table(letter_all_matches_summary,file=paste(out_folder_path,"\\","letter_all_matches_summary",".csv",sep=""), append=FALSE, na="NA", 
+#             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+# 
+# write.table(letter_all_matches_beg,file=paste(out_folder_path,"\\","letter_all_matches_beg",".csv",sep=""), append=FALSE, na="NA", 
+#             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+# 
+# write.table(letter_all_matches_end,file=paste(out_folder_path,"\\","letter_all_matches_end",".csv",sep=""), append=FALSE, na="NA", 
+#             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+# 
+# write.table(letter_all_matches_sign,file=paste(out_folder_path,"\\","letter_all_matches_sign",".csv",sep=""), append=FALSE, na="NA", 
+#             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+# 
+# write.table(letter_all_matches_pos,file=paste(out_folder_path,"\\","letter_all_matches_pos",".csv",sep=""), append=FALSE, na="NA", 
+#             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
+# 
+# write.table(letter_all_matches_close,file=paste(out_folder_path,"\\","letter_all_matches_close",".csv",sep=""), append=FALSE, na="NA", 
+#             sep = ",", quote = TRUE,dec = ".",  qmethod = "double", col.names=TRUE, row.names = FALSE)
 
