@@ -210,8 +210,8 @@ cat("Import HTML entities \n")
 ###############################################################################
 
 #Encode HTML entities
-#entity_encoding0 <- read.csv(file=paste(output_directory,"Entity_encoding.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-entity_encoding0 <- read.table(file=paste(output_directory,"Entity_encoding.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
+#entity_encoding0 <- read.csv(file=paste(input_directory,"Entity_encoding.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+entity_encoding0 <- read.table(file=paste(input_directory,"Entity_encoding.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
                                sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 
 #Clean
@@ -247,8 +247,8 @@ rm(entity_encoding0,entity_encoding_clean)
 cat("Import HTML tags \n")
 ###############################################################################
 
-#html_tags0 <- read.csv(file=paste(output_directory,"HTML_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-html_tags0 <- read.table(file=paste(output_directory,"HTML_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
+#html_tags0 <- read.csv(file=paste(input_directory,"HTML_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+html_tags0 <- read.table(file=paste(input_directory,"HTML_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
                          sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 
 #Clean
@@ -286,8 +286,8 @@ rm(html_tags0,html_tags1,html_tags_clean)
 cat("Import SEC tags \n")
 ###############################################################################
 
-#sec_tags0 <- read.csv(file=paste(output_directory,"SEC_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-sec_tags0 <- read.table(file=paste(output_directory,"SEC_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
+#sec_tags0 <- read.csv(file=paste(input_directory,"SEC_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+sec_tags0 <- read.table(file=paste(input_directory,"SEC_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
                         sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 
 #Clean
@@ -325,25 +325,24 @@ rm(sec_tags0,sec_tags1,sec_tags_clean)
 cat("Get header information \n")
 ###############################################################################
 
-filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"), 
-                             .fun = function(x, path_output,subfolder,entity_encoding,html_tags,sec_tags){
+filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),  .fun = function(x, path_output,subfolder,entity_encoding,html_tags,sec_tags){
                                
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2005),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2006),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2007),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2008),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2009),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2010),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2011),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2012),]
-                               #x <- filings_trim2[(filings_trim2[,"yr"]==2013),]
-                               #path_output <- paste(output_directory,downloadfolder,sep=slash)
-                               #subfolder <- headerfolder
-                               #entity_encoding <- entity_encoding
-                               #html_tags <- html_tags
-                               #sec_tags <- sec_tags
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2005),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2006),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2007),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2008),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2009),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2010),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2011),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2012),]
+                               #  x <- filings_trim2[(filings_trim2[,"yr"]==2013),]
+                               #  path_output <- paste(output_directory,downloadfolder,sep=slash)
+                               #  subfolder <- headerfolder
+                               #  entity_encoding <- entity_encoding
+                               #  html_tags <- html_tags
+                               #  sec_tags <- sec_tags
                                
                                filings_trim2_short <- x[,!(colnames(x) %in% c("file_txt","file_index_htm"))]
                                
@@ -378,20 +377,19 @@ filings_header_info <- dlply(.data=filings_trim2, .variables=c("yr"),
                                
                                rm(downloaded_files2)
                                
-                               trim_headings <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                                      .fun = function(y,entity_encoding,html_tags,sec_tags){
+                               trim_headings <- dlply(.data=downloaded_files3, .variables=c("yr_id"), .fun = function(y,entity_encoding,html_tags,sec_tags){
                                                         
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.hdr.sgml"),]
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000842939-03-000055.hdr.sgml"),]
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-03-054193.hdr.sgml"),]
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001108086-05-000062.hdr.sgml"),]
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000930413-10-000059.hdr.sgml"),]
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0000078713-13-000036.hdr.sgml"),]
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-13-456867.hdr.sgml"),]
-                                                        #y <- downloaded_files3[(downloaded_files3[,"file"]=="0001571049-13-000837.hdr.sgml"),]
-                                                        #y <- downloaded_files3[1,]
+                                                        #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.hdr.sgml"),]
+                                                        #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000842939-03-000055.hdr.sgml"),]
+                                                        #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-03-054193.hdr.sgml"),]
+                                                        #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0001108086-05-000062.hdr.sgml"),]
+                                                        #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000930413-10-000059.hdr.sgml"),]
+                                                        #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0000078713-13-000036.hdr.sgml"),]
+                                                        #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0001193125-13-456867.hdr.sgml"),]
+                                                        #  y <- downloaded_files3[(downloaded_files3[,"file"]=="0001571049-13-000837.hdr.sgml"),]
+                                                        #  y <- downloaded_files3[1,]
                                                         
-                                                        #entity_encoding <- entity_encoding
+                                                        #  entity_encoding <- entity_encoding
                                                         
                                                         file <- unique(y[,"file"])
                                                         filepath <- unique(y[,"filepath"])

@@ -1,9 +1,12 @@
 Edgar_Filings_Shareholder_Letters
 =================================
 
-Download and Parse Edgar Filings
+A.  Download and Parse Edgar Filings:
 
-A.  Initial Execution Order:
+    *** Make sure to execute the Download_Edgar_Filings code prior to running this code ***
+
+    Execution Order:
+
       1. Get_Header_Info.R
       2. Get_Document.R
       3. Clean_Raw_Filings.R
@@ -13,6 +16,17 @@ A.  Initial Execution Order:
       7. Collapse_Filings.R
       
       
-      
-***NOTE*** 
-Make sure to execture the Download_Edgar_Filings Code prior to running this code.
+B.  Data Management :
+
+    *** In additon to completing section A, make sure to execute the Edgar_Filings_NSAR code prior to running this code ***
+
+    Execution Order:
+
+      1. Combine_Headers.R
+      2. XXXXXXXXXX.R
+      3. 
+      4. 
+      5. 
+      6. 
+      7. 
+

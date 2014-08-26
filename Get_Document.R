@@ -213,8 +213,8 @@ cat("Import HTML entities \n")
 ###############################################################################
 
 #Encode HTML entities
-#entity_encoding0 <- read.csv(file=paste(output_directory,"Entity_encoding.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-entity_encoding0 <- read.table(file=paste(output_directory,"Entity_encoding.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
+#entity_encoding0 <- read.csv(file=paste(input_directory,"Entity_encoding.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+entity_encoding0 <- read.table(file=paste(input_directory,"Entity_encoding.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
                                sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 
 #Clean
@@ -250,8 +250,8 @@ rm(entity_encoding0,entity_encoding_clean)
 cat("Import HTML tags \n")
 ###############################################################################
 
-#html_tags0 <- read.csv(file=paste(output_directory,"HTML_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-html_tags0 <- read.table(file=paste(output_directory,"HTML_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
+#html_tags0 <- read.csv(file=paste(input_directory,"HTML_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+html_tags0 <- read.table(file=paste(input_directory,"HTML_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
                          sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 
 #Clean
@@ -289,8 +289,8 @@ rm(html_tags0,html_tags1,html_tags_clean)
 cat("Import SEC tags \n")
 ###############################################################################
 
-#sec_tags0 <- read.csv(file=paste(output_directory,"SEC_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
-sec_tags0 <- read.table(file=paste(output_directory,"SEC_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
+#sec_tags0 <- read.csv(file=paste(input_directory,"SEC_tags.csv",sep="\\"),header=TRUE,na.strings="NA",stringsAsFactors=FALSE)
+sec_tags0 <- read.table(file=paste(input_directory,"SEC_tags.csv",sep="\\"), header = TRUE, na.strings="NA",stringsAsFactors=FALSE, 
                         sep = ",", quote = "\"",dec = ".", fill = TRUE, comment.char = "")
 
 #Clean
@@ -328,8 +328,7 @@ rm(sec_tags0,sec_tags1,sec_tags_clean)
 cat("Get Document information \n")
 ###############################################################################
 
-bad_tags_full <- dlply(.data=filings_trim2, .variables=c("yr"), 
-                       .fun = function(x, path_output,subfolder,subfolder_output,entity_encoding,filetype,html_tags,sec_tags){
+bad_tags_full <- dlply(.data=filings_trim2, .variables=c("yr"), .fun = function(x, path_output,subfolder,subfolder_output,entity_encoding,filetype,html_tags,sec_tags){
                          
                          #  x <- filings_trim2[(filings_trim2[,"yr"]==2003),]
                          #  x <- filings_trim2[(filings_trim2[,"yr"]==2004),]
@@ -387,8 +386,7 @@ bad_tags_full <- dlply(.data=filings_trim2, .variables=c("yr"),
                          rm(downloaded_files2)
                          
                          #EXPORT FILES
-                         bad_tags <- dlply(.data=downloaded_files3, .variables=c("yr_id"), 
-                                           .fun = function(y,sub_folder_output_path,entity_encoding,filetype,html_tags,sec_tags){
+                         bad_tags <- dlply(.data=downloaded_files3, .variables=c("yr_id"),  .fun = function(y,sub_folder_output_path,entity_encoding,filetype,html_tags,sec_tags){
                                              
                                              # y <- downloaded_files3[(downloaded_files3[,"file"]=="0000072760-03-000038.txt"),]
                                              # y <- downloaded_files3[(downloaded_files3[,"file"]=="0000088053-03-000790.txt"),]
